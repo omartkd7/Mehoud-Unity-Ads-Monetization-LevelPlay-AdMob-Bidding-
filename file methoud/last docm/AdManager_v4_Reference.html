@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdManager v4 — Complete Reference & Ad Calling Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2230;
+    --accent: #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #a3ff4f;
+    --text: #e2e8f0;
+    --muted: #6b7694;
+    --warn: #ffbe3d;
+    --ok: #a3ff4f;
+    --fail: #ff4d6d;
+    --code-bg: #0d1117;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #0d1117 0%, #0a0f1e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 64px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(0,229,255,.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .badge-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 4px;
+    letter-spacing: .05em;
+  }
+  .badge-blue  { background: rgba(0,229,255,.12); color: var(--accent); border:1px solid rgba(0,229,255,.25); }
+  .badge-green { background: rgba(163,255,79,.12); color: var(--accent3); border:1px solid rgba(163,255,79,.25); }
+  .badge-red   { background: rgba(255,77,109,.12); color: var(--accent2); border:1px solid rgba(255,77,109,.25); }
+  .badge-warn  { background: rgba(255,190,61,.12); color: var(--warn); border:1px solid rgba(255,190,61,.25); }
+
+  header h1 { font-size: clamp(28px,4vw,44px); font-weight:800; letter-spacing:-.02em; line-height:1.1; margin-bottom:10px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size:14px; max-width:680px; }
+
+  /* ── NAV ── */
+  .nav-bar {
+    display:flex; gap:8px; flex-wrap:wrap;
+    padding:14px 64px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+    position:sticky; top:0; z-index:100;
+  }
+  .nav-bar a {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:600;
+    color:var(--muted);
+    text-decoration:none;
+    padding:4px 10px;
+    border-radius:4px;
+    border:1px solid transparent;
+    transition:all .2s;
+  }
+  .nav-bar a:hover { color:var(--accent); border-color:rgba(0,229,255,.3); }
+  .nav-bar a.new { color:var(--accent3); border-color:rgba(163,255,79,.3); background:rgba(163,255,79,.06); }
+  .nav-bar a.hot { color:var(--accent2); border-color:rgba(255,77,109,.3); background:rgba(255,77,109,.06); }
+
+  /* ── LAYOUT ── */
+  .container { max-width:1100px; margin:0 auto; padding:0 32px 80px; }
+  section { margin-top:56px; }
+
+  .section-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; font-weight:700;
+    color:var(--accent);
+    letter-spacing:.15em;
+    text-transform:uppercase;
+    margin-bottom:10px;
+    opacity:.7;
+  }
+  h2 { font-size:22px; font-weight:700; letter-spacing:-.01em; margin-bottom:20px; color:#fff; }
+  h3 {
+    font-size:15px; font-weight:700;
+    color:var(--accent);
+    margin:28px 0 10px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  p { color:#a8b3cc; margin-bottom:12px; }
+
+  .category-heading {
+    font-size:11px; font-weight:700; letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+    margin:36px 0 14px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--border);
+  }
+
+  /* ── STATUS TABLE ── */
+  .status-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:13.5px; }
+  .status-table th {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; font-weight:700;
+    color:var(--muted); letter-spacing:.1em; text-transform:uppercase;
+    text-align:left; padding:8px 14px;
+    border-bottom:1px solid var(--border);
+  }
+  .status-table td { padding:11px 14px; border-bottom:1px solid rgba(30,34,48,.7); vertical-align:top; }
+  .status-table tr:last-child td { border-bottom:none; }
+  .status-table tr:hover td { background:rgba(255,255,255,.02); }
+
+  .pill {
+    display:inline-block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; font-weight:700;
+    padding:2px 8px; border-radius:3px;
+    white-space:nowrap;
+  }
+  .pill-ok   { background:rgba(163,255,79,.15); color:var(--ok); }
+  .pill-fail { background:rgba(255,77,109,.15); color:var(--fail); }
+  .pill-warn { background:rgba(255,190,61,.15); color:var(--warn); }
+  .pill-info { background:rgba(0,229,255,.12);  color:var(--accent); }
+
+  /* ── METHOD CARD ── */
+  .method-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:20px; overflow:hidden; }
+  .method-header {
+    display:flex; align-items:center; gap:10px;
+    padding:13px 20px;
+    border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,.02);
+  }
+  .method-name { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:#fff; flex:1; }
+  .method-name span { color:var(--accent); }
+  .method-body { padding:16px 20px; }
+  .method-body p { font-size:13.5px; margin-bottom:10px; }
+  .method-body p:last-child { margin-bottom:0; }
+
+  .method-meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .meta-tag {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; font-weight:600;
+    padding:2px 8px; border-radius:3px;
+    border:1px solid var(--border);
+    color:var(--muted);
+  }
+  .meta-tag.ret { color:var(--warn); border-color:rgba(255,190,61,.3); background:rgba(255,190,61,.05); }
+  .meta-tag.cat { color:var(--accent); border-color:rgba(0,229,255,.25); background:rgba(0,229,255,.05); }
+  .meta-tag.fix { color:var(--fail); border-color:rgba(255,77,109,.3); background:rgba(255,77,109,.05); }
+
+  /* ── FLOW ── */
+  .flow { display:flex; flex-direction:column; gap:0; margin:12px 0; }
+  .flow-step { display:flex; gap:14px; padding:10px 0; border-bottom:1px solid rgba(30,34,48,.5); }
+  .flow-step:last-child { border-bottom:none; }
+  .flow-num {
+    flex-shrink:0; width:24px; height:24px;
+    border-radius:50%;
+    background:rgba(0,229,255,.12); border:1px solid rgba(0,229,255,.3);
+    color:var(--accent);
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .flow-text { font-size:13px; color:#a8b3cc; padding-top:2px; }
+
+  /* ── DIFF CARD ── */
+  .diff-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:16px; overflow:hidden; }
+  .diff-header {
+    display:flex; align-items:center; gap:10px;
+    padding:12px 18px; border-bottom:1px solid var(--border);
+    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:#fff;
+  }
+  .diff-header .icon { font-size:16px; }
+  .diff-body { padding:14px 18px; }
+  .diff-body p { font-size:13.5px; margin-bottom:8px; }
+  .diff-body p:last-child { margin-bottom:0; }
+
+  /* ── CODE ── */
+  pre, code { font-family:'JetBrains Mono',monospace; font-size:12.5px; }
+  pre {
+    background:var(--code-bg); border:1px solid var(--border);
+    border-radius:8px; padding:16px 18px;
+    overflow-x:auto; margin:10px 0; line-height:1.6;
+  }
+  code { background:rgba(0,229,255,.09); color:var(--accent); padding:1px 5px; border-radius:3px; font-size:12px; }
+  pre code { background:none; color:inherit; padding:0; border-radius:0; font-size:inherit; }
+
+  .line-del { color:var(--fail); }
+  .line-add { color:var(--ok); }
+  .line-key { color:var(--warn); }
+  .line-str { color:#a3d7ff; }
+  .line-cmt { color:var(--muted); }
+  .line-kw  { color:#c792ea; }
+
+  /* ── CHECKLIST ── */
+  .checklist { list-style:none; }
+  .checklist li {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:8px 0; border-bottom:1px solid rgba(30,34,48,.5);
+    font-size:13.5px; color:#a8b3cc;
+  }
+  .checklist li:last-child { border-bottom:none; }
+  .checklist li .chk {
+    flex-shrink:0; width:18px; height:18px;
+    border-radius:3px; margin-top:2px;
+    display:flex; align-items:center; justify-content:center; font-size:11px;
+  }
+  .chk-ok   { background:rgba(163,255,79,.2); color:var(--ok); }
+  .chk-fail { background:rgba(255,77,109,.2); color:var(--fail); }
+  .chk-warn { background:rgba(255,190,61,.2); color:var(--warn); }
+
+  /* ── ALERT BOX ── */
+  .alert {
+    display:flex; gap:14px;
+    padding:14px 18px; border-radius:8px; margin:16px 0; font-size:13.5px;
+  }
+  .alert-warn  { background:rgba(255,190,61,.08); border:1px solid rgba(255,190,61,.25); color:#e8c97a; }
+  .alert-ok    { background:rgba(163,255,79,.07); border:1px solid rgba(163,255,79,.2);  color:#b8e87a; }
+  .alert-fail  { background:rgba(255,77,109,.08); border:1px solid rgba(255,77,109,.25); color:#ff8fa0; }
+  .alert-info  { background:rgba(0,229,255,.07); border:1px solid rgba(0,229,255,.2);   color:#80d8ff; }
+  .alert-icon  { font-size:18px; flex-shrink:0; }
+
+  /* ── GRID ── */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  @media(max-width:800px) { .grid2,.grid3 { grid-template-columns:1fr; } }
+
+  hr { border:none; border-top:1px solid var(--border); margin:40px 0; }
+
+  /* ── TOC ── */
+  .toc { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px 24px; margin-top:32px; }
+  .toc h3 { margin-top:0; margin-bottom:12px; }
+  .toc ol { padding-left:18px; }
+  .toc li { padding:3px 0; font-size:13.5px; color:#a8b3cc; }
+  .toc a { color:var(--accent); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+
+  /* ── CALL RECIPE ── */
+  .recipe {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; margin-bottom:20px; overflow:hidden;
+  }
+  .recipe-header {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 20px; border-bottom:1px solid var(--border);
+    background:rgba(0,229,255,.03);
+  }
+  .recipe-icon { font-size:20px; }
+  .recipe-title { font-weight:700; color:#fff; font-size:14px; }
+  .recipe-subtitle { font-size:12px; color:var(--muted); margin-top:2px; font-family:'JetBrains Mono',monospace; }
+  .recipe-body { padding:16px 20px; }
+  .recipe-body p { font-size:13.5px; margin-bottom:10px; }
+
+  /* ── EVENT BADGE ── */
+  .event-fires {
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:#80d8ff;
+    background:rgba(0,229,255,.07);
+    border:1px solid rgba(0,229,255,.2);
+    border-radius:4px; padding:2px 8px;
+    margin:4px 0;
+  }
+
+  @media(max-width:700px) {
+    header,.nav-bar { padding-left:20px; padding-right:20px; }
+    .container { padding-left:20px; padding-right:20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="badge-row">
+    <span class="badge badge-green">AdManager v4 (Final)</span>
+    <span class="badge badge-blue">LevelPlay SDK v9.3.0</span>
+    <span class="badge badge-blue">Unity 6000.0.71f1</span>
+    <span class="badge badge-green">✓ Signatures Verified from Source</span>
+    <span class="badge badge-green">✓ OnAdsCompleted System Documented</span>
+    <span class="badge badge-warn">⚠ 2 Inspector Values Still Needed</span>
+    <span class="badge badge-green">✓ API Verified Against Actual SDK Source Files</span>
+  </div>
+  <h1>AdManager <span>v4</span> — Reference &amp; Ad Calling Guide</h1>
+  <p>All method signatures verified directly against actual <code>com.unity.services.levelplay</code> SDK source files. Corrects 5 wrong signatures (v3 + v4 docs). API types verified: <code>LevelPlayBannerPosition</code>, <code>LevelPlayAdSize.LARGE</code>, <code>LevelPlay.SetMetaData()</code> for CCPA, <code>LevelPlay.Init(appKey, userId)</code>. Every ad call pattern shown with real, working code.</p>
+</header>
+
+<!-- ══ NAV ══ -->
+<nav class="nav-bar">
+  <a href="#fixes" class="hot">🔴 v3 Fixes</a>
+  <a href="#sdk-status">SDK Status</a>
+  <a href="#calling" class="new">★ How to Call Ads</a>
+  <a href="#methods">Method Reference</a>
+  <a href="#adsCompleted" class="new">★ OnAdsCompleted</a>
+  <a href="#events">All Events</a>
+  <a href="#stopping">Stop Ads</a>
+  <a href="#country">Country/Tier</a>
+  <a href="#adfree">Ad-Free</a>
+  <a href="#placements">Placements</a>
+  <a href="#checklist">Checklist</a>
+</nav>
+
+<div class="container">
+
+<!-- ══════════════════════════════════════════════
+     SECTION 0 — v3 DOC FIXES
+══════════════════════════════════════════════ -->
+<section id="fixes">
+  <div class="section-label">Critical Corrections · v3 Doc vs Live Code</div>
+  <h2>5 Wrong Signatures Fixed (v3 + v4 Docs)</h2>
+  <p>These were in the v3/v4 HTML docs but do not match the actual <code>AdManager.cs</code> source or <code>com.unity.services.levelplay</code> SDK API. Use the ✅ versions below.</p>
+
+  <div class="diff-card">
+    <div class="diff-header"><span class="icon">🔴</span><span>FIX 1 — ShowRewarded() actual signature</span><span class="pill pill-fail" style="margin-left:auto">WRONG IN v3 DOC</span></div>
+    <div class="diff-body">
+      <p>v3 doc showed <code>ShowRewarded(placement, onEarned, onClosed)</code> — THREE parameters. The real method only takes TWO: placement and a single optional callback that fires on reward earned.</p>
+      <pre><span class="line-del">// ❌ v3 doc (wrong — onClosed doesn't exist in this method):</span>
+<span class="line-del">AdManager.Instance.ShowRewarded("DoubleCoins", OnEarned, OnClosed);</span>
+
+<span class="line-add">// ✅ ACTUAL signature (from AdManager.cs line 426):</span>
+<span class="line-add">bool ShowRewarded(string placementName, Action onRewarded = null)</span>
+<span class="line-add">// Returns true if the ad was shown, false if not ready</span>
+AdManager.Instance.ShowRewarded(<span class="line-str">"double_coins"</span>, () => { GiveDoubleCoins(); });</pre>
+    </div>
+  </div>
+
+  <div class="diff-card">
+    <div class="diff-header"><span class="icon">🔴</span><span>FIX 2 — TryShowInterstitial() actual signature</span><span class="pill pill-fail" style="margin-left:auto">WRONG IN v3 DOC</span></div>
+    <div class="diff-body">
+      <p>v3 doc showed <code>TryShowInterstitial(placement, onClosed)</code> — TWO parameters with a callback. The real method only takes the placement string. There is no <code>onClosed</code> parameter — subscribe to <code>OnInterstitialClosed</code> event instead.</p>
+      <pre><span class="line-del">// ❌ v3 doc (wrong — no onClosed callback):</span>
+<span class="line-del">AdManager.Instance.TryShowInterstitial("LevelComplete", () => { LoadNextLevel(); });</span>
+
+<span class="line-add">// ✅ ACTUAL signature (from AdManager.cs line 533):</span>
+<span class="line-add">bool TryShowInterstitial(string placementName)</span>
+AdManager.Instance.TryShowInterstitial(<span class="line-str">"level_complete"</span>);
+<span class="line-cmt">// To react after close → subscribe to OnInterstitialClosed event</span></pre>
+    </div>
+  </div>
+
+  <div class="diff-card">
+    <div class="diff-header"><span class="icon">🔴</span><span>FIX 3 — OnLevelComplete() actual signature</span><span class="pill pill-fail" style="margin-left:auto">WRONG IN v3 DOC</span></div>
+    <div class="diff-body">
+      <p>v3 doc showed <code>OnLevelComplete(levelNumber, onAdClosed)</code> — TWO parameters with a callback. The real method only takes <code>int levelNumber</code>.</p>
+      <pre><span class="line-del">// ❌ v3 doc (wrong):</span>
+<span class="line-del">AdManager.Instance.OnLevelComplete(5, () => { ShowLevelCompleteUI(); });</span>
+
+<span class="line-add">// ✅ ACTUAL signature (from AdManager.cs line 730):</span>
+<span class="line-add">void OnLevelComplete(int levelNumber)</span>
+AdManager.Instance.OnLevelComplete(<span class="line-key">5</span>);</pre>
+    </div>
+  </div>
+
+  <div class="diff-card">
+    <div class="diff-header"><span class="icon">🟡</span><span>FIX 4 — Placement name strings</span><span class="pill pill-warn" style="margin-left:auto">WRONG IN v3 DOC</span></div>
+    <div class="diff-body">
+      <p>v3 doc listed placement strings as <code>"Revive"</code>, <code>"DoubleReward"</code>, <code>"DailyBonus"</code>, etc. Your code defines them as constants in <code>AdManager.Placement</code> — use those, never raw strings.</p>
+      <pre><span class="line-del">// ❌ v3 doc (raw strings, wrong values):</span>
+<span class="line-del">ShowRewarded("Revive", ...);</span>
+
+<span class="line-add">// ✅ Use constants (from AdManager.cs Placement class):</span>
+AdManager.Placement.ContinueGame     <span class="line-cmt">// "continue_game"</span>
+AdManager.Placement.DoubleCoins      <span class="line-cmt">// "double_coins"</span>
+AdManager.Placement.DailyBonus       <span class="line-cmt">// "daily_bonus"</span>
+AdManager.Placement.SkipWait         <span class="line-cmt">// "skip_wait"</span>
+AdManager.Placement.LevelComplete    <span class="line-cmt">// "level_complete"</span>
+AdManager.Placement.MenuTransition   <span class="line-cmt">// "menu_transition"</span>
+AdManager.Placement.PostOnboarding   <span class="line-cmt">// "post_onboarding"</span>
+AdManager.Placement.ExtraLives       <span class="line-cmt">// "extra_lives"</span>
+AdManager.Placement.UnlockContent    <span class="line-cmt">// "unlock_content"</span></pre>
+    </div>
+  </div>
+
+
+  <div class="diff-card">
+    <div class="diff-header"><span class="icon">🟡</span><span>FIX 5 — Banner API types &amp; constructor (verified from SDK source)</span><span class="pill pill-warn" style="margin-left:auto">WRONG IN v4 DOC</span></div>
+    <div class="diff-body">
+      <p>The v4 doc used types that don't exist in the actual SDK. All three were found by reading the package source files directly.</p>
+      <pre><span class="line-del">// ❌ v4 doc (wrong types):</span>
+<span class="line-del">new LevelPlayBannerAd(unitId, size, pos)             // wrong constructor</span>
+<span class="line-del">LevelPlayAdPosition.BottomCenter                     // type doesn't exist</span>
+<span class="line-del">LevelPlayAdSize.LARGE_BANNER                         // doesn't exist</span>
+<span class="line-del">LevelPlay.SetDoNotSell(bool)                         // doesn't exist</span>
+<span class="line-del">LevelPlay.Init(appKey, userId, adFormats[])          // no adFormats param</span>
+
+<span class="line-add">// ✅ ACTUAL SDK API (from com.unity.services.levelplay source):</span>
+<span class="line-add">var cfg = new LevelPlayBannerAd.Config.Builder()     // Builder pattern</span>
+<span class="line-add">    .SetSize(LevelPlayAdSize.LARGE)                  // LARGE not LARGE_BANNER</span>
+<span class="line-add">    .SetPosition(LevelPlayBannerPosition.BottomCenter) // BannerPosition not AdPosition</span>
+<span class="line-add">    .SetDisplayOnLoad(true).Build();</span>
+<span class="line-add">new LevelPlayBannerAd(unitId, cfg);</span>
+<span class="line-add">LevelPlay.SetMetaData("do_not_sell", "true");        // CCPA via MetaData</span>
+<span class="line-add">LevelPlay.Init(appKey, userId: "");                  // no adFormats param</span></pre>
+    </div>
+  </div>
+
+  <div class="alert alert-ok">
+    <span class="alert-icon">✅</span>
+    <div>All 4 fixes applied in this v4 doc. Every code sample below uses the correct signatures from your live <code>AdManager.cs</code>.</div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 1 — SDK STATUS
+══════════════════════════════════════════════ -->
+<section id="sdk-status">
+  <div class="section-label">Section 1</div>
+  <h2>SDK Status &amp; Component Health</h2>
+
+  <table class="status-table">
+    <thead>
+      <tr><th>Component</th><th>Status</th><th>SDK Version</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>SDK Package</td><td><span class="pill pill-ok">✓ INSTALLED</span></td><td>v9.3.0</td><td><code>com.unity.services.levelplay</code> — UNITY_LEVELPLAY auto-defined on install</td></tr>
+      <tr><td>Define Symbol</td><td><span class="pill pill-ok">✓ SET</span></td><td>—</td><td><code>UNITY_LEVELPLAY</code> on Android + iOS + Standalone</td></tr>
+      <tr><td>SDK Init + Retry</td><td><span class="pill pill-ok">✓ READY</span></td><td>v9.3.0</td><td>3 retries, 30s delay. Uses <code>LevelPlay.Init(appKey)</code></td></tr>
+      <tr><td>Rewarded Ads</td><td><span class="pill pill-ok">✓ READY</span></td><td>v9.3.0</td><td>Re-entrancy safe. Two-param event handlers.</td></tr>
+      <tr><td>Interstitial Ads</td><td><span class="pill pill-ok">✓ READY</span></td><td>v9.3.0</td><td>Day-1 / tutorial / cap / cooldown guards active</td></tr>
+      <tr><td>Banner Ads</td><td><span class="pill pill-ok">✓ READY</span></td><td>v9.3.0</td><td>Uses <code>LevelPlayBannerAd.Config.Builder()</code> with <code>LevelPlayAdSize.LARGE</code> (not LARGE_BANNER) and <code>LevelPlayBannerPosition</code> (not LevelPlayAdPosition)</td></tr>
+      <tr><td>RewardedPromptUI</td><td><span class="pill pill-warn">⚠ NEEDS SCENE</span></td><td>—</td><td>Script ready. Place prefab in scene as INACTIVE object.</td></tr>
+      <tr><td>OnAdsCompleted Event</td><td><span class="pill pill-ok">✓ READY</span></td><td>—</td><td>Universal event. Fires for all ad types. New in v3 code.</td></tr>
+      <tr><td>Country Detection</td><td><span class="pill pill-ok">✓ READY</span></td><td>—</td><td>Server-verified + locale fallback. Call <code>SetServerCountryCode()</code>.</td></tr>
+      <tr><td>Ad-Free IAP Guard</td><td><span class="pill pill-ok">✓ READY</span></td><td>—</td><td>3-level: memory → PlayerPrefs → 72h grace period</td></tr>
+      <tr><td>App Open Ad</td><td><span class="pill pill-warn">⚠ PLACEHOLDER</span></td><td>v9.3.0</td><td>Uses interstitial as proxy. Set <code>appOpenAdUnitId</code> in Inspector.</td></tr>
+      <tr><td>GDPR / CCPA</td><td><span class="pill pill-ok">✓ READY</span></td><td>v9.3.0</td><td>SetConsent (deprecated) + <code>LevelPlay.SetMetaData("do_not_sell", ...)</code> for CCPA. No IronSource.Agent.*</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     ★ SECTION 2 — HOW TO CALL ADS
+══════════════════════════════════════════════ -->
+<section id="calling">
+  <div class="section-label">Section 2 · Most Important</div>
+  <h2>How To Call Ads — Every Pattern</h2>
+  <p>All examples use the verified method signatures from <code>AdManager.cs</code>. Copy-paste ready.</p>
+
+  <!-- REWARDED -->
+  <div class="category-heading">Rewarded Ads — Calling Patterns</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🎁</span>
+      <div>
+        <div class="recipe-title">Pattern A — Game Over: Revive / Continue Offer</div>
+        <div class="recipe-subtitle">OnGameOver() → shows RewardedPromptUI → rewarded ad on accept</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <p>The highest-value rewarded placement. Shows the prompt UI automatically. The 5-second countdown is built in.</p>
+      <pre><span class="line-cmt">// In your GameOverManager.cs:</span>
+<span class="line-kw">void</span> HandleGameOver()
+{
+    AdManager.Instance.OnGameOver(
+        onRevived: () =>
+        {
+            <span class="line-cmt">// Player watched the ad and earned the revive</span>
+            _playerHealth = _maxHealth;
+            ResumeGameplay();
+        },
+        onDied: () =>
+        {
+            <span class="line-cmt">// Player declined OR no rewarded ad was ready</span>
+            ShowGameOverScreen();
+        }
+    );
+}</pre>
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <div>If no rewarded ad is ready, <code>onDied</code> fires immediately — no popup shown. The method fails gracefully so your game flow always continues.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">💰</span>
+      <div>
+        <div class="recipe-title">Pattern B — Double Reward Offer</div>
+        <div class="recipe-subtitle">OnDoubleRewardOffer() → shows prompt UI → 8-second countdown</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-cmt">// At level complete screen:</span>
+<span class="line-kw">void</span> ShowDoubleCoinsOffer(<span class="line-kw">int</span> coinsEarned)
+{
+    AdManager.Instance.OnDoubleRewardOffer(
+        label:     <span class="line-str">"2× Coins"</span>,   <span class="line-cmt">// shown in the prompt UI</span>
+        onDoubled: () => { GiveCoins(coinsEarned * <span class="line-key">2</span>); ShowNextLevelButton(); },
+        onSkipped: () => { GiveCoins(coinsEarned);      ShowNextLevelButton(); }
+    );
+}</pre>
+    </div>
+  </div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🎯</span>
+      <div>
+        <div class="recipe-title">Pattern C — Daily Bonus Offer</div>
+        <div class="recipe-subtitle">OnDailyBonusOffer() → no countdown by default</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-cmt">// In your DailyBonusManager.cs (guard daily cooldown yourself):</span>
+<span class="line-kw">void</span> ShowDailyBonus()
+{
+    AdManager.Instance.OnDailyBonusOffer(
+        onClaimed: () =>
+        {
+            GiveDailyGems(<span class="line-key">50</span>);
+            PlayerPrefs.SetString(<span class="line-str">"daily_bonus_date"</span>, DateTime.UtcNow.ToString(<span class="line-str">"O"</span>));
+            PlayerPrefs.Save();
+        }
+    );
+    <span class="line-cmt">// Note: if player ignores the popup, onClaimed is NOT called.</span>
+    <span class="line-cmt">// Only fires if they watch the ad OR no ad was ready (graceful give).</span>
+}</pre>
+    </div>
+  </div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">⏩</span>
+      <div>
+        <div class="recipe-title">Pattern D — Skip Timer / Wait Offer</div>
+        <div class="recipe-subtitle">OnSkipTimerOffer() → 5-second countdown prompt</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-kw">void</span> ShowSkipTimerButton()
+{
+    skipButton.onClick.AddListener(() =>
+    {
+        AdManager.Instance.OnSkipTimerOffer(
+            label:     <span class="line-str">"Skip 2h wait"</span>,
+            onSkipped: () => { _timerSeconds = <span class="line-key">0</span>; UpdateTimerUI(); }
+        );
+    });
+}</pre>
+    </div>
+  </div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">▶️</span>
+      <div>
+        <div class="recipe-title">Pattern E — Direct Rewarded Ad (no prompt UI)</div>
+        <div class="recipe-subtitle">ShowRewarded() → shows ad immediately if ready</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <p>Use when you have your own custom UI for the offer and just need to show the ad directly.</p>
+      <pre><span class="line-cmt">// Check readiness before showing your watch button:</span>
+watchButton.gameObject.SetActive(AdManager.Instance.IsRewardedReady());
+
+<span class="line-cmt">// On button click:</span>
+<span class="line-kw">void</span> OnWatchAdClicked()
+{
+    <span class="line-kw">bool</span> shown = AdManager.Instance.ShowRewarded(
+        AdManager.Placement.UnlockContent,
+        onRewarded: () =>
+        {
+            <span class="line-cmt">// Called by SDK when user earns the reward</span>
+            UnlockSkin(<span class="line-str">"rare_hat"</span>);
+        }
+    );
+
+    <span class="line-kw">if</span> (!shown)
+    {
+        <span class="line-cmt">// Ad wasn't ready — show fallback (buy with coins, etc)</span>
+        ShowBuyWithCoinsDialog();
+    }
+}</pre>
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div><strong>Note:</strong> The <code>onRewarded</code> callback fires when the SDK confirms the reward was earned (before the ad closes). If the player skips the ad, the callback is NOT called. Listen to <code>OnRewardSkipped</code> event for skip handling.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERSTITIAL -->
+  <div class="category-heading">Interstitial Ads — Calling Patterns</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">📺</span>
+      <div>
+        <div class="recipe-title">Pattern F — Level Complete Interstitial</div>
+        <div class="recipe-subtitle">OnLevelComplete() → TryShowInterstitial() with all guards applied</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <p>The standard interstitial call. All guards (day-1, tutorial, cooldown, session cap) run automatically.</p>
+      <pre><span class="line-cmt">// Call every time a level ends — guards handle blocking early levels.</span>
+<span class="line-kw">void</span> CompleteLevel(<span class="line-kw">int</span> levelNumber)
+{
+    SaveProgress(levelNumber);
+    AdManager.Instance.OnLevelComplete(levelNumber);
+    <span class="line-cmt">// ShowLevelCompleteUI() here — don't wait for the ad</span>
+    ShowLevelCompleteUI();
+}
+
+<span class="line-cmt">// To run code AFTER the ad closes → subscribe to the event:</span>
+<span class="line-kw">void</span> OnEnable()
+{
+    AdManager.Instance.OnInterstitialClosed += HandleInterstitialClosed;
+}
+<span class="line-kw">void</span> HandleInterstitialClosed() { LoadNextLevelScene(); }
+<span class="line-kw">void</span> OnDestroy()
+{
+    AdManager.Instance.OnInterstitialClosed -= HandleInterstitialClosed;
+}</pre>
+    </div>
+  </div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🔀</span>
+      <div>
+        <div class="recipe-title">Pattern G — Manual Interstitial with Guards</div>
+        <div class="recipe-subtitle">TryShowInterstitial() directly on any custom trigger</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-kw">void</span> OnMenuOpen()
+{
+    <span class="line-cmt">// This calls TryShowInterstitial + ShowBanner internally</span>
+    AdManager.Instance.OnMenuOpen();
+}
+
+<span class="line-cmt">// OR manually trigger an interstitial at any point:</span>
+<span class="line-kw">void</span> OnShopClosed()
+{
+    <span class="line-kw">if</span> (!_isBossFight && !_isInCutscene)
+        AdManager.Instance.TryShowInterstitial(AdManager.Placement.MenuTransition);
+}
+
+<span class="line-cmt">// Check readiness without showing (for optional/bonus triggers):</span>
+<span class="line-kw">if</span> (AdManager.Instance.IsInterstitialReady())
+    AdManager.Instance.TryShowInterstitial(<span class="line-str">"bonus_trigger"</span>);</pre>
+    </div>
+  </div>
+
+  <!-- BANNER -->
+  <div class="category-heading">Banner Ads — Calling Patterns</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🟦</span>
+      <div>
+        <div class="recipe-title">Pattern H — Banner Show / Hide (Standard Game Flow)</div>
+        <div class="recipe-subtitle">Show on menu, hide during gameplay, destroy on IAP</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-cmt">// ── When main menu opens ──────────────────────────</span>
+<span class="line-kw">void</span> ShowMainMenu()
+{
+    AdManager.Instance.OnMenuOpen();   <span class="line-cmt">// loads + shows banner automatically</span>
+    ShowMenuUI();
+}
+
+<span class="line-cmt">// ── When gameplay starts ──────────────────────────</span>
+<span class="line-kw">void</span> StartGameplay()
+{
+    AdManager.Instance.OnGameplayStart();  <span class="line-cmt">// hides banner (stays in memory)</span>
+    BeginRound();
+}
+
+<span class="line-cmt">// ── Manual control if needed ──────────────────────</span>
+AdManager.Instance.ShowBanner();    <span class="line-cmt">// re-show without reloading</span>
+AdManager.Instance.HideBanner();    <span class="line-cmt">// hide (preserves loaded ad)</span>
+AdManager.Instance.DestroyBanner(); <span class="line-cmt">// full destroy (requires LoadBanner() to restore)</span>
+AdManager.Instance.LoadBanner();    <span class="line-cmt">// load new banner if destroyed</span>
+<span class="line-kw">bool</span> visible = AdManager.Instance.IsBannerVisible();</pre>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div class="category-heading">Onboarding &amp; Lifecycle Hooks</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🎓</span>
+      <div>
+        <div class="recipe-title">Pattern I — Tutorial End &amp; Game Lifecycle</div>
+        <div class="recipe-subtitle">Unlocks interstitials after tutorial, handles menu/gameplay transitions</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-cmt">// ── Called ONCE when tutorial/onboarding finishes ──</span>
+AdManager.Instance.OnOnboardingComplete();
+<span class="line-cmt">// Internally: marks totalLevels ≥ tutorialLevelCount → interstitials unlock</span>
+
+<span class="line-cmt">// ── Standard game lifecycle calls ──────────────────</span>
+AdManager.Instance.OnMenuOpen();         <span class="line-cmt">// menu shown (interstitial + banner)</span>
+AdManager.Instance.OnGameplayStart();    <span class="line-cmt">// round begins (banner hidden)</span>
+AdManager.Instance.OnLevelComplete(<span class="line-key">5</span>); <span class="line-cmt">// level 5 done (interstitial attempt)</span></pre>
+    </div>
+  </div>
+
+  <!-- UNIVERSAL CALLBACK -->
+  <div class="category-heading">Universal Callback — React to Any Ad Completion</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">📡</span>
+      <div>
+        <div class="recipe-title">Pattern J — Using OnAdsCompleted (Recommended for Analytics)</div>
+        <div class="recipe-subtitle">Single subscription point for all ad outcomes in any script</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <p>Subscribe once and handle all ad outcomes centrally. Works across scenes.</p>
+      <pre><span class="line-kw">void</span> OnEnable()
+{
+    AdManager.Instance.OnAdsCompleted += HandleAdsCompleted;
+}
+
+<span class="line-kw">void</span> HandleAdsCompleted(AdManager.AdsCompletedArgs args)
+{
+    <span class="line-kw">switch</span> (args.Type)
+    {
+        <span class="line-kw">case</span> AdManager.AdsCompletedType.RewardedEarned:
+            <span class="line-cmt">// args.WasRewarded == true, args.PlacementName set</span>
+            GiveRewardForPlacement(args.PlacementName);
+            AnalyticsManager.LogAdReward(args.PlacementName);
+            <span class="line-kw">break</span>;
+
+        <span class="line-kw">case</span> AdManager.AdsCompletedType.RewardedSkipped:
+            AnalyticsManager.LogAdSkip(args.PlacementName);
+            <span class="line-kw">break</span>;
+
+        <span class="line-kw">case</span> AdManager.AdsCompletedType.InterstitialClosed:
+            <span class="line-cmt">// args.PlacementName tells you which placement closed</span>
+            <span class="line-kw">if</span> (args.PlacementName == AdManager.Placement.LevelComplete)
+                TransitionToNextLevel();
+            <span class="line-kw">break</span>;
+
+        <span class="line-kw">case</span> AdManager.AdsCompletedType.BannerLoaded:
+            AdjustLayoutForBanner();
+            <span class="line-kw">break</span>;
+    }
+}
+
+<span class="line-kw">void</span> OnDestroy()
+{
+    <span class="line-kw">if</span> (AdManager.Instance != <span class="line-key">null</span>)
+        AdManager.Instance.OnAdsCompleted -= HandleAdsCompleted;
+}</pre>
+    </div>
+  </div>
+
+  <!-- CONSENT -->
+  <div class="category-heading">GDPR / Privacy (Must call before first SDK init)</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">🔒</span>
+      <div>
+        <div class="recipe-title">Pattern K — Consent &amp; Privacy (v9.3.0)</div>
+        <div class="recipe-subtitle">SetUserConsent() / SetDoNotSell() — PlayerPrefs only, no IronSource.Agent</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div><code>IronSource.Agent.setConsent()</code> is <strong>removed</strong> in LevelPlay v9.3.0. These PlayerPrefs calls are the only correct approach.</div>
+      </div>
+      <pre><span class="line-cmt">// Show your GDPR dialog BEFORE AdManager.Start() runs (or in the first frame).</span>
+<span class="line-cmt">// AdManager reads these values at SDK init time.</span>
+
+<span class="line-cmt">// ── After player agrees ──────────────────────────</span>
+AdManager.SetUserConsent(<span class="line-add">true</span>);   <span class="line-cmt">// static method — call before SDK init</span>
+AdManager.SetDoNotSell(<span class="line-del">false</span>);    <span class="line-cmt">// false = selling allowed (CCPA)</span>
+
+<span class="line-cmt">// ── California CCPA toggle (in settings screen) ──</span>
+AdManager.SetDoNotSell(<span class="line-add">true</span>);     <span class="line-cmt">// player opts out of data sale</span>
+
+<span class="line-cmt">// ── Read current state ───────────────────────────</span>
+<span class="line-kw">bool</span> consented  = AdManager.GetUserConsent();
+<span class="line-kw">bool</span> noSell     = AdManager.GetDoNotSell();</pre>
+    </div>
+  </div>
+
+  <!-- IAP -->
+  <div class="category-heading">Ad-Free IAP Purchase</div>
+
+  <div class="recipe">
+    <div class="recipe-header">
+      <span class="recipe-icon">💎</span>
+      <div>
+        <div class="recipe-title">Pattern L — Remove Ads Purchase Flow</div>
+        <div class="recipe-subtitle">SetAdFree() → local unlock → SetAdFreeVerified() → server lock</div>
+      </div>
+    </div>
+    <div class="recipe-body">
+      <pre><span class="line-cmt">// ── Step 1: Unity IAP purchase complete ────────────</span>
+<span class="line-kw">void</span> OnPurchaseComplete(PurchaseEventArgs args)
+{
+    AdManager.Instance.SetAdFree();
+    <span class="line-cmt">// Banner disappears instantly. Interstitials blocked.</span>
+    StartReceiptValidation(args.purchasedProduct.receipt);
+}
+
+<span class="line-cmt">// ── Step 2: After server validates receipt ──────────</span>
+YourServer.ValidateReceipt(receipt, result =>
+{
+    AdManager.Instance.SetAdFreeVerified(result.isValid);
+    <span class="line-cmt">// true  → permanently ad-free (server trust level)</span>
+    <span class="line-cmt">// false → 72h grace period only, then ads resume</span>
+});
+
+<span class="line-cmt">// ── Check status anywhere ───────────────────────────</span>
+<span class="line-kw">if</span> (AdManager.Instance.IsAdFree())
+{
+    removeAdsButton.SetActive(<span class="line-del">false</span>);
+    ShowPremiumBadge();
+}</pre>
+    </div>
+  </div>
+
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 3 — METHOD REFERENCE
+══════════════════════════════════════════════ -->
+<section id="methods">
+  <div class="section-label">Section 3 · Full Method Reference</div>
+  <h2>Every Public Method — Verified Signatures</h2>
+  <p>All signatures verified from <code>AdManager.cs</code> source. Return types and parameters are exact.</p>
+
+  <!-- SDK INIT -->
+  <div class="category-heading">SDK Initialization</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> InitializeSDK() <span style="color:var(--muted);font-size:11px">— private</span></div>
+      <span class="pill pill-info">AUTO</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Init</span>
+        <span class="meta-tag ret">Returns: void</span>
+        <span class="meta-tag">Called by: Start()</span>
+      </div>
+      <p>Called automatically in <code>Start()</code>. Never call manually. Reads the platform-correct app key, calls <code>LevelPlay.Init(appKey)</code>, registers all events. On success loads Rewarded, Interstitial, and Banner. Up to 3 auto-retries with 30s delay on failure.</p>
+    </div>
+  </div>
+
+  <!-- REWARDED -->
+  <div class="category-heading">Rewarded Ads</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>bool</span> IsRewardedReady()</div>
+      <span class="pill pill-ok">SAFE ANYTIME</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Rewarded</span>
+        <span class="meta-tag ret">Returns: bool</span>
+      </div>
+      <p>Returns <code>true</code> only if SDK is initialized AND a rewarded ad is loaded. Use this to show/hide your Watch Ad button.</p>
+      <pre>watchButton.SetActive(AdManager.Instance.IsRewardedReady());</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>bool</span> ShowRewarded(<span>string</span> placementName, <span>Action</span> onRewarded = null)</div>
+      <span class="pill pill-warn">REQUIRES READY</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Rewarded</span>
+        <span class="meta-tag ret">Returns: bool — true if ad shown</span>
+        <span class="meta-tag fix">v3 doc had wrong 3-param signature</span>
+        <span class="meta-tag">Fires: OnRewardGranted · OnRewardSkipped · OnAdsCompleted</span>
+      </div>
+      <p>Shows the rewarded ad immediately (no prompt UI). Returns <code>false</code> if the SDK is not ready or no ad is loaded. The <code>onRewarded</code> callback fires when the SDK confirms the reward was earned — NOT on ad close.</p>
+      <pre>bool shown = AdManager.Instance.ShowRewarded(
+    AdManager.Placement.UnlockContent,
+    onRewarded: () => { UnlockItem(); }
+);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> LoadRewarded()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Rewarded</span>
+      </div>
+      <p>Manually trigger a rewarded ad load. Normally called automatically. Safe to call if you think the ad failed to load. Skipped if SDK not initialized.</p>
+      <pre>AdManager.Instance.LoadRewarded(); <span class="line-cmt">// rare — only if auto-load seems stuck</span></pre>
+    </div>
+  </div>
+
+  <!-- REWARDED PROMPT -->
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> ShowRewardedPrompt(<span>string</span> placementName, <span>Action</span> onAccepted, <span>Action</span> onDeclined = null)</div>
+      <span class="pill pill-warn">UPDATED IN v5</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Rewarded</span>
+        <span class="meta-tag fix">v4 doc showed RewardPromptConfig — does not exist in AdManager v4</span>
+        <span class="meta-tag">Fires: OnAdsCompleted · OnRewardGranted · OnRewardSkipped</span>
+      </div>
+      <p>Shows a rewarded ad if one is ready. If not ready, calls <code>onDeclined</code> immediately. Normally use the convenience wrappers (<code>OnGameOver</code>, <code>OnDoubleRewardOffer</code>, etc.) which call this internally. Use directly for fully custom placement prompts.</p>
+      <pre><span class="line-cmt">// Actual signature — no RewardPromptConfig class exists in AdManager v4:</span>
+AdManager.Instance.ShowRewardedPrompt(
+    AdManager.Placement.ExtraLives,
+    onAccepted: () => { GiveExtraLives(<span class="line-key">3</span>); },
+    onDeclined: () => { ShowGameOverScreen(); }
+);</pre>
+    </div>
+  </div>
+
+  <!-- GAME HOOKS -->
+  <div class="category-heading">Game Hook Convenience Methods</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> OnGameOver(<span>Action</span> onRevived, <span>Action</span> onDied = null)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Game Hook</span>
+      </div>
+      <p>Shows a revive/continue rewarded prompt with 5s countdown. If no rewarded ad ready → calls <code>onDied</code> immediately.</p>
+      <pre>AdManager.Instance.OnGameOver(
+    onRevived: () => { RevivePlayer(); },
+    onDied:    () => { ShowDeathScreen(); }
+);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> OnDoubleRewardOffer(<span>string</span> label, <span>Action</span> onDoubled, <span>Action</span> onSkipped = null)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Game Hook</span>
+      </div>
+      <p>Shows a rewarded prompt with 8s countdown. <code>label</code> is displayed in the prompt UI ("2× Coins", "+50 Gems", etc.).</p>
+      <pre>AdManager.Instance.OnDoubleRewardOffer(
+    label:     <span class="line-str">"2× Gems"</span>,
+    onDoubled: () => { GiveGems(earned * <span class="line-key">2</span>); },
+    onSkipped: () => { GiveGems(earned); }
+);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> OnDailyBonusOffer(<span>Action</span> onClaimed)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Game Hook</span>
+      </div>
+      <p>Shows a rewarded prompt with no countdown. If no ad ready, calls <code>onClaimed</code> for free (graceful fallback). If player ignores the popup, <code>onClaimed</code> is NOT called.</p>
+      <pre>AdManager.Instance.OnDailyBonusOffer(onClaimed: () => { GiveDailyReward(); });</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> OnSkipTimerOffer(<span>string</span> label, <span>Action</span> onSkipped)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Game Hook</span>
+      </div>
+      <p>Shows a rewarded prompt with 5s countdown. <code>label</code> describes what is being skipped. If no ad ready, calls <code>onSkipped</code> for free.</p>
+      <pre>AdManager.Instance.OnSkipTimerOffer(<span class="line-str">"Skip 2h wait"</span>, () => { RefillEnergy(); });</pre>
+    </div>
+  </div>
+
+  <!-- INTERSTITIAL -->
+  <div class="category-heading">Interstitial Ads</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> OnLevelComplete(<span>int</span> levelNumber)</div>
+      <span class="pill pill-warn">FIXED IN v4</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Game Hook / Interstitial</span>
+        <span class="meta-tag fix">v3 doc had wrong 2-param signature with callback</span>
+      </div>
+      <p>Updates internal level counter and calls <code>TryShowInterstitial("level_complete")</code>. Tutorial guard uses the level number. Call every time a level ends.</p>
+      <pre>AdManager.Instance.OnLevelComplete(currentLevel);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>bool</span> TryShowInterstitial(<span>string</span> placementName)</div>
+      <span class="pill pill-warn">FIXED IN v4</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Interstitial</span>
+        <span class="meta-tag ret">Returns: bool — true if ad was shown</span>
+        <span class="meta-tag fix">v3 doc had wrong 2-param signature with onClosed callback</span>
+        <span class="meta-tag">Fires: OnInterstitialClosed · OnAdsCompleted</span>
+      </div>
+      <p>Runs all guards in order (SDK ready → ad loaded → day-1 → tutorial → session cap → cooldown). Returns <code>false</code> if any guard fails. Returns <code>true</code> if the ad was shown. To react after close, subscribe to <code>OnInterstitialClosed</code>.</p>
+      <pre><span class="line-cmt">// Guards run automatically. Safe to call on any trigger.</span>
+AdManager.Instance.TryShowInterstitial(AdManager.Placement.MenuTransition);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>bool</span> IsInterstitialReady()</div>
+      <span class="pill pill-ok">SAFE ANYTIME</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Interstitial</span>
+        <span class="meta-tag ret">Returns: bool</span>
+      </div>
+      <p>Returns <code>true</code> if SDK is initialized and an interstitial is loaded. Note: this does NOT check guards — <code>TryShowInterstitial()</code> checks those at show time.</p>
+      <pre><span class="line-kw">if</span> (AdManager.Instance.IsInterstitialReady())
+    AdManager.Instance.TryShowInterstitial(<span class="line-str">"bonus_trigger"</span>);</pre>
+    </div>
+  </div>
+
+  <!-- BANNER -->
+  <div class="category-heading">Banner Ads</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> LoadBanner() &nbsp;/&nbsp; <span>void</span> ShowBanner() &nbsp;/&nbsp; <span>void</span> HideBanner() &nbsp;/&nbsp; <span>void</span> DestroyBanner()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Banner</span>
+      </div>
+      <p><strong>LoadBanner()</strong> — creates <code>LevelPlayBannerAd(bannerAdUnitId)</code>, registers events, calls <code>.LoadAd()</code>. On load success, calls <code>ShowBanner()</code> automatically. Usually called by <code>OnMenuOpen()</code>.</p>
+      <p><strong>ShowBanner()</strong> — calls <code>.ShowAd()</code>. Skipped if not loaded or already visible.</p>
+      <p><strong>HideBanner()</strong> — calls <code>.HideAd()</code>. Ad stays in memory. Called by <code>OnGameplayStart()</code>.</p>
+      <p><strong>DestroyBanner()</strong> — unsubscribes all events, calls <code>.DestroyAd()</code>, nulls reference. Called by <code>SetAdFree()</code>. Need to call <code>LoadBanner()</code> to get a new one after this.</p>
+      <pre>AdManager.Instance.LoadBanner();    <span class="line-cmt">// if manually needed</span>
+<span class="line-kw">bool</span> vis = AdManager.Instance.IsBannerVisible();</pre>
+    </div>
+  </div>
+
+  <!-- CONSENT -->
+  <div class="category-heading">Consent &amp; Privacy</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>static void</span> SetUserConsent(<span>bool</span>) &nbsp;/&nbsp; <span>static bool</span> GetUserConsent()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Privacy</span>
+        <span class="meta-tag">Static — call on class, not Instance</span>
+      </div>
+      <p>Saves GDPR consent to PlayerPrefs key <code>"ad_user_consent"</code>. The SDK reads this at init. Call before first SDK init on fresh install, and when player changes consent in your settings UI.</p>
+      <pre>AdManager.SetUserConsent(<span class="line-add">true</span>);  <span class="line-cmt">// static</span></pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>static void</span> SetDoNotSell(<span>bool</span>) &nbsp;/&nbsp; <span>static bool</span> GetDoNotSell()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Privacy</span>
+        <span class="meta-tag">Static — call on class, not Instance</span>
+      </div>
+      <p>CCPA opt-out flag. Saves to PlayerPrefs key <code>"ad_do_not_sell"</code>. Expose a toggle in your Privacy Settings screen.</p>
+      <pre>AdManager.SetDoNotSell(<span class="line-add">true</span>);   <span class="line-cmt">// player opts out of data sale (static)</span></pre>
+    </div>
+  </div>
+
+  <!-- COUNTRY -->
+  <div class="category-heading">Country &amp; Tier</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> SetServerCountryCode(<span>string</span> code)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Country</span>
+      </div>
+      <p>Accepts a 2-letter ISO code (e.g. <code>"MA"</code>, <code>"US"</code>). Overrides the device locale fallback. Updates the country tier and cooldown immediately. Call as soon as your backend login response arrives.</p>
+      <pre>AdManager.Instance.SetServerCountryCode(loginResponse.country);</pre>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>string</span> GetCountryCode() &nbsp; <span>UserTier</span> GetUserTier() &nbsp; <span>bool</span> IsCountryVerified() &nbsp; <span>int</span> GetDaysSinceInstall()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Country / Analytics</span>
+        <span class="meta-tag ret">GetUserTier returns UserTier enum (Tier1/Tier2/Tier3)</span>
+      </div>
+      <pre>string code     = AdManager.Instance.GetCountryCode();     <span class="line-cmt">// "MA"</span>
+AdManager.UserTier tier = AdManager.Instance.GetUserTier(); <span class="line-cmt">// Tier3</span>
+<span class="line-kw">bool</span>   verified = AdManager.Instance.IsCountryVerified();   <span class="line-cmt">// true after server set</span>
+<span class="line-kw">int</span>    days     = AdManager.Instance.GetDaysSinceInstall(); <span class="line-cmt">// days since first launch</span></pre>
+    </div>
+  </div>
+
+  <!-- AD FREE -->
+  <div class="category-heading">Ad-Free IAP System</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> SetAdFree()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta"><span class="meta-tag cat">Category: Ad-Free</span></div>
+      <p>Call immediately after IAP purchase completes. Writes local flag + UTC timestamp (starts 72h grace), destroys banner immediately. Does NOT yet trust at server level.</p>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> SetAdFreeVerified(<span>bool</span> verified)</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta"><span class="meta-tag cat">Category: Ad-Free</span></div>
+      <p>Call after your server validates the receipt. <code>true</code> → server-level trust (permanent). <code>false</code> → clears all flags, ads resume (hacker rejection path).</p>
+    </div>
+  </div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>bool</span> IsAdFree()</div>
+      <span class="pill pill-ok">SAFE ANYTIME</span>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Ad-Free</span>
+        <span class="meta-tag ret">Returns: bool</span>
+      </div>
+      <p>Single source of truth. Checks: in-memory flag → server-verified PlayerPrefs → 72h grace period. Returns <code>true</code> if any pass. Use to show/hide ad-related UI elements.</p>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="category-heading">Analytics &amp; Stats</div>
+
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>AdSessionStats</span> GetSessionStats()</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Analytics</span>
+        <span class="meta-tag ret">Returns: AdSessionStats object</span>
+      </div>
+      <p>Returns a snapshot of the current session's ad statistics. Useful for dashboards or analytics reporting. Stats include opt-in rate, completion rate, session revenue.</p>
+      <pre>AdSessionStats s = AdManager.Instance.GetSessionStats();
+Debug.Log(s.ToString());
+<span class="line-cmt">// "Session 3 [MA/Tier3] | RV opt-in 72.3% | IS 4 | Revenue $0.0041"</span>
+
+<span class="line-cmt">// Individual fields:</span>
+<span class="line-kw">float</span> optIn      = s.RewardedOptInRate;     <span class="line-cmt">// 0.0–1.0</span>
+<span class="line-kw">float</span> completion = s.RewardedCompletionRate; <span class="line-cmt">// 0.0–1.0</span>
+<span class="line-kw">int</span>   isShown    = s.InterstitialsShown;
+<span class="line-kw">float</span> revenue    = s.TotalAdRevenue;</pre>
+    </div>
+  </div>
+
+  <!-- MANUAL AdsCompleted -->
+  <div class="method-card">
+    <div class="method-header">
+      <div class="method-name"><span>void</span> AdsCompleted(<span>AdsCompletedType</span> type, <span>string</span> placement = "", <span>bool</span> wasRewarded = false, <span>string</span> adInfo = "")</div>
+    </div>
+    <div class="method-body">
+      <div class="method-meta">
+        <span class="meta-tag cat">Category: Analytics / Testing</span>
+        <span class="meta-tag">Fires: OnAdsCompleted</span>
+      </div>
+      <p>Manually fires the <code>OnAdsCompleted</code> event. Useful for testing your <code>OnAdsCompleted</code> subscriber in the Editor without showing a real ad.</p>
+      <pre><span class="line-cmt">// Simulate a reward earned for testing:</span>
+AdManager.Instance.AdsCompleted(
+    AdManager.AdsCompletedType.RewardedEarned,
+    placement:   AdManager.Placement.DoubleCoins,
+    wasRewarded: <span class="line-add">true</span>
+);</pre>
+    </div>
+  </div>
+
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     ★ SECTION 4 — OnAdsCompleted SYSTEM
+══════════════════════════════════════════════ -->
+<section id="adsCompleted">
+  <div class="section-label">Section 4 · NEW — Universal Callback System</div>
+  <h2>OnAdsCompleted — Universal Ad Event</h2>
+  <p>A single event that fires for every ad outcome. Subscribe from any script in any scene. Pairs with the existing individual events (<code>OnRewardGranted</code>, etc.) — they are NOT mutually exclusive.</p>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">ℹ️</span>
+    <div>This system did not exist in v2. It was added in your v3 code as a universal callback for all ad completions. Use it for analytics, cross-scene reactions, and UI updates.</div>
+  </div>
+
+  <h3>// AdsCompletedType enum values</h3>
+  <table class="status-table">
+    <thead><tr><th>Type</th><th>WasRewarded</th><th>When it fires</th></tr></thead>
+    <tbody>
+      <tr><td><code>RewardedEarned</code></td><td><span class="pill pill-ok">true</span></td><td>Player watched rewarded ad to completion and earned reward</td></tr>
+      <tr><td><code>RewardedSkipped</code></td><td><span class="pill pill-fail">false</span></td><td>Rewarded ad was closed early (or show failed)</td></tr>
+      <tr><td><code>InterstitialClosed</code></td><td><span class="pill pill-fail">false</span></td><td>Interstitial dismissed by player</td></tr>
+      <tr><td><code>BannerLoaded</code></td><td><span class="pill pill-fail">false</span></td><td>Banner ad loaded and is now visible</td></tr>
+      <tr><td><code>AppOpenClosed</code></td><td><span class="pill pill-fail">false</span></td><td>App Open ad (foreground resume) was dismissed</td></tr>
+    </tbody>
+  </table>
+
+  <h3>// AdsCompletedArgs fields</h3>
+  <table class="status-table">
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>args.Type</code></td><td><code>AdsCompletedType</code></td><td>Which ad type completed (see enum above)</td></tr>
+      <tr><td><code>args.PlacementName</code></td><td><code>string</code></td><td>The placement string (e.g. <code>"double_coins"</code>). Empty for banners.</td></tr>
+      <tr><td><code>args.WasRewarded</code></td><td><code>bool</code></td><td>True only for <code>RewardedEarned</code></td></tr>
+      <tr><td><code>args.AdInfo</code></td><td><code>string</code></td><td>SDK's <code>LevelPlayAdInfo.ToString()</code> — for logging/analytics</td></tr>
+    </tbody>
+  </table>
+
+  <h3>// Full example: centralized ad analytics handler</h3>
+  <pre><span class="line-kw">public class</span> AdAnalyticsHandler : MonoBehaviour
+{
+    <span class="line-kw">void</span> OnEnable()
+    {
+        AdManager.Instance.OnAdsCompleted += OnAdCompleted;
+    }
+
+    <span class="line-kw">void</span> OnAdCompleted(AdManager.AdsCompletedArgs args)
+    {
+        <span class="line-cmt">// Send to Firebase, Adjust, etc.</span>
+        FirebaseAnalytics.LogEvent(<span class="line-str">"ad_completed"</span>,
+            <span class="line-str">"type"</span>,      args.Type.ToString(),
+            <span class="line-str">"placement"</span>, args.PlacementName,
+            <span class="line-str">"rewarded"</span>,  args.WasRewarded ? <span class="line-str">"1"</span> : <span class="line-str">"0"</span>
+        );
+
+        <span class="line-cmt">// React to type</span>
+        <span class="line-kw">if</span> (args.Type == AdManager.AdsCompletedType.RewardedEarned
+         && args.PlacementName == AdManager.Placement.DoubleCoins)
+        {
+            DoubleCurrentCoins();
+        }
+    }
+
+    <span class="line-kw">void</span> OnDestroy()
+    {
+        <span class="line-kw">if</span> (AdManager.Instance != <span class="line-key">null</span>)
+            AdManager.Instance.OnAdsCompleted -= OnAdCompleted;
+    }
+}</pre>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 5 — ALL EVENTS
+══════════════════════════════════════════════ -->
+<section id="events">
+  <div class="section-label">Section 5</div>
+  <h2>All Events — Subscribe &amp; Unsubscribe</h2>
+  <p>Always unsubscribe in <code>OnDestroy()</code> to avoid memory leaks and double-fires.</p>
+
+  <table class="status-table">
+    <thead><tr><th>Event</th><th>Signature</th><th>When it fires</th></tr></thead>
+    <tbody>
+      <tr><td><code>OnAdsCompleted</code></td><td><code>Action&lt;AdsCompletedArgs&gt;</code></td><td>All ad outcomes. Universal catch-all. Use for analytics.</td></tr>
+      <tr><td><code>OnSDKReady</code></td><td><code>Action</code></td><td>Once, when SDK init succeeds. Show ad-related UI here.</td></tr>
+      <tr><td><code>OnRewardGranted</code></td><td><code>Action&lt;string&gt;</code></td><td>Reward earned. Arg: placement name string.</td></tr>
+      <tr><td><code>OnRewardSkipped</code></td><td><code>Action&lt;string&gt;</code></td><td>Rewarded ad closed without earning. Arg: placement name.</td></tr>
+      <tr><td><code>OnInterstitialClosed</code></td><td><code>Action</code></td><td>Any interstitial dismissed by the player.</td></tr>
+    </tbody>
+  </table>
+
+  <pre><span class="line-kw">void</span> OnEnable()
+{
+    AdManager.Instance.OnSDKReady           += HandleSDKReady;
+    AdManager.Instance.OnAdsCompleted       += HandleAdsCompleted;
+    AdManager.Instance.OnRewardGranted      += HandleRewardGranted;
+    AdManager.Instance.OnRewardSkipped      += HandleRewardSkipped;
+    AdManager.Instance.OnInterstitialClosed += HandleInterstitialClosed;
+}
+
+<span class="line-kw">void</span> HandleSDKReady()                                        { ShowAdButtons(); }
+<span class="line-kw">void</span> HandleAdsCompleted(AdManager.AdsCompletedArgs args)     { LogToAnalytics(args); }
+<span class="line-kw">void</span> HandleRewardGranted(<span class="line-kw">string</span> placement)                  { GiveReward(placement); }
+<span class="line-kw">void</span> HandleRewardSkipped(<span class="line-kw">string</span> placement)                  { ShowSkipFeedback(); }
+<span class="line-kw">void</span> HandleInterstitialClosed()                              { ResumeGame(); }
+
+<span class="line-kw">void</span> OnDestroy()
+{
+    <span class="line-kw">if</span> (AdManager.Instance == <span class="line-key">null</span>) <span class="line-kw">return</span>;
+    AdManager.Instance.OnSDKReady           -= HandleSDKReady;
+    AdManager.Instance.OnAdsCompleted       -= HandleAdsCompleted;
+    AdManager.Instance.OnRewardGranted      -= HandleRewardGranted;
+    AdManager.Instance.OnRewardSkipped      -= HandleRewardSkipped;
+    AdManager.Instance.OnInterstitialClosed -= HandleInterstitialClosed;
+}</pre>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 6 — STOPPING ADS
+══════════════════════════════════════════════ -->
+<section id="stopping">
+  <div class="section-label">Section 6</div>
+  <h2>How To Stop / Block Ads</h2>
+
+  <table class="status-table">
+    <thead><tr><th>Method / Guard</th><th>What it blocks</th><th>How to trigger</th></tr></thead>
+    <tbody>
+      <tr><td><code>SetAdFree()</code></td><td>All ads — banner destroyed, interstitials skip automatically</td><td>After successful IAP purchase</td></tr>
+      <tr><td><code>HideBanner()</code></td><td>Banner hidden visually (stays loaded in memory)</td><td>Called by <code>OnGameplayStart()</code></td></tr>
+      <tr><td><code>DestroyBanner()</code></td><td>Banner fully removed for session</td><td>Called by <code>SetAdFree()</code> or manually</td></tr>
+      <tr><td>Day-1 guard</td><td>Interstitials blocked on install day</td><td><code>interstitialUnlockAfterDays = 1</code> in Inspector</td></tr>
+      <tr><td>Tutorial guard</td><td>Interstitials blocked until N levels done</td><td><code>tutorialLevelCount = 3</code> in Inspector</td></tr>
+      <tr><td>Session cap</td><td>Interstitials stop after N per session</td><td><code>maxInterstitialsPerSession = 6</code> in Inspector</td></tr>
+      <tr><td>Cooldown timer</td><td>Interstitials blocked until cooldown elapsed</td><td>Auto-set by country tier (120/90/60s)</td></tr>
+      <tr><td>App Open cooldown</td><td>Foreground ad blocked until cooldown elapsed</td><td><code>appOpenCooldownSeconds = 180</code> in Inspector</td></tr>
+    </tbody>
+  </table>
+
+  <h3>// Custom block — add your own guard around TryShowInterstitial</h3>
+  <pre><span class="line-cmt">// TryShowInterstitial checks all SDK guards. Add your own around it:</span>
+<span class="line-kw">if</span> (!_isBossFight && !_isInCutscene)
+    AdManager.Instance.TryShowInterstitial(AdManager.Placement.LevelComplete);</pre>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 7 — COUNTRY / TIER
+══════════════════════════════════════════════ -->
+<section id="country">
+  <div class="section-label">Section 7</div>
+  <h2>Country Detection &amp; Tier Cooldowns</h2>
+
+  <div class="alert alert-warn">
+    <span class="alert-icon">⚠️</span>
+    <div><strong>Why this matters for Morocco (MA):</strong> Without server verification, a player in Morocco with a French-locale phone is classified as Tier 1 (France) → 120s cooldown instead of 60s. That's 2× fewer interstitials shown per session — real revenue loss. Always call <code>SetServerCountryCode()</code> after login.</div>
+  </div>
+
+  <pre><span class="line-cmt">// ── Call after your login/session API responds: ──</span>
+AdManager.Instance.SetServerCountryCode(serverResponse.countryCode);
+<span class="line-cmt">// "MA" → Tier 3 → 60s cooldown (more frequent interstitials)</span>
+<span class="line-cmt">// "US" → Tier 1 → 120s cooldown (higher CPM, fewer needed)</span>
+<span class="line-cmt">// "BR" → Tier 2 → 90s cooldown</span></pre>
+
+  <table class="status-table">
+    <thead><tr><th>Tier</th><th>Countries (examples)</th><th>Cooldown (Inspector default)</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill pill-fail">Tier 1</span></td><td>US GB AU CA DE JP FR KR NL NO SE DK CH NZ FI SG HK AT IE BE</td><td>120s</td></tr>
+      <tr><td><span class="pill pill-warn">Tier 2</span></td><td>BR MX IN RU TR PL ES IT AR ZA TH MY CZ HU RO UA SA AE IL GR</td><td>90s</td></tr>
+      <tr><td><span class="pill pill-info">Tier 3</span></td><td>All others (MA, DZ, EG, NG, PK, PH, VN, ID, BD…)</td><td>60s</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 8 — AD-FREE
+══════════════════════════════════════════════ -->
+<section id="adfree">
+  <div class="section-label">Section 8</div>
+  <h2>Ad-Free IAP Guard — 3-Level Trust System</h2>
+
+  <div class="alert alert-fail">
+    <span class="alert-icon">🔴</span>
+    <div><strong>Security:</strong> Reading only <code>PlayerPrefs.GetInt("ad_free_purchased")</code> lets any rooted Android user edit the value and get ad-free for free. The 3-level system below blocks this.</div>
+  </div>
+
+  <div class="grid2">
+    <div class="diff-card">
+      <div class="diff-header"><span class="icon">🛡️</span> Level 1 — In-Memory Flag</div>
+      <div class="diff-body"><p><code>_adFreeServerVerified</code> — private bool. Unreachable from disk. Set by <code>SetAdFreeVerified(true)</code>.</p></div>
+    </div>
+    <div class="diff-card">
+      <div class="diff-header"><span class="icon">💾</span> Level 2 — Server-Verified PlayerPrefs</div>
+      <div class="diff-body"><p><code>"ad_free_server_verified" = 1</code>. Set by <code>SetAdFreeVerified(true)</code>. Survives app restarts. Not enough alone — Level 1 must also be set.</p></div>
+    </div>
+    <div class="diff-card">
+      <div class="diff-header"><span class="icon">⏱️</span> Level 3 — 72h Grace Period</div>
+      <div class="diff-body"><p>Covers real buyers who purchased offline. UTC timestamp stored at <code>SetAdFree()</code>. After 72h without server verification, ads resume.</p></div>
+    </div>
+    <div class="diff-card">
+      <div class="diff-header"><span class="icon">🔒</span> Why Hackers Fail</div>
+      <div class="diff-body"><p>Faking <code>"ad_free_purchased" = 1</code> in PlayerPrefs gets no real purchase timestamp. Grace period also fails immediately. All 3 levels must pass.</p></div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 9 — PLACEMENT NAMES
+══════════════════════════════════════════════ -->
+<section id="placements">
+  <div class="section-label">Section 9</div>
+  <h2>Placement Constants — Use These, Not Raw Strings</h2>
+  <p>Defined in <code>AdManager.Placement</code> static class. Never hardcode raw strings across multiple files.</p>
+
+  <table class="status-table">
+    <thead><tr><th>Constant</th><th>String Value</th><th>Ad Type</th><th>Triggered By</th></tr></thead>
+    <tbody>
+      <tr><td><code>AdManager.Placement.ContinueGame</code></td><td><code>"continue_game"</code></td><td>Rewarded</td><td><code>OnGameOver()</code></td></tr>
+      <tr><td><code>AdManager.Placement.DoubleCoins</code></td><td><code>"double_coins"</code></td><td>Rewarded</td><td><code>OnDoubleRewardOffer()</code></td></tr>
+      <tr><td><code>AdManager.Placement.ExtraLives</code></td><td><code>"extra_lives"</code></td><td>Rewarded</td><td>Custom <code>ShowRewardedPrompt()</code></td></tr>
+      <tr><td><code>AdManager.Placement.DailyBonus</code></td><td><code>"daily_bonus"</code></td><td>Rewarded</td><td><code>OnDailyBonusOffer()</code></td></tr>
+      <tr><td><code>AdManager.Placement.UnlockContent</code></td><td><code>"unlock_content"</code></td><td>Rewarded</td><td>Custom <code>ShowRewarded()</code></td></tr>
+      <tr><td><code>AdManager.Placement.SkipWait</code></td><td><code>"skip_wait"</code></td><td>Rewarded</td><td><code>OnSkipTimerOffer()</code></td></tr>
+      <tr><td><code>AdManager.Placement.LevelComplete</code></td><td><code>"level_complete"</code></td><td>Interstitial</td><td><code>OnLevelComplete()</code></td></tr>
+      <tr><td><code>AdManager.Placement.MenuTransition</code></td><td><code>"menu_transition"</code></td><td>Interstitial</td><td><code>OnMenuOpen()</code></td></tr>
+      <tr><td><code>AdManager.Placement.PostOnboarding</code></td><td><code>"post_onboarding"</code></td><td>Interstitial</td><td><code>OnOnboardingComplete()</code></td></tr>
+      <tr><td><code>AdManager.Placement.PersistentBottom</code></td><td><code>"persistent_bottom"</code></td><td>Banner</td><td><code>LoadBanner()</code></td></tr>
+      <tr><td><code>AdManager.Placement.AppForeground</code></td><td><code>"app_foreground"</code></td><td>App Open (IS proxy)</td><td>App resume after pause</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════
+     SECTION 10 — CHECKLIST
+══════════════════════════════════════════════ -->
+<section id="checklist">
+  <div class="section-label">Section 10</div>
+  <h2>Pre-Launch Checklist</h2>
+
+  <h3>// SDK &amp; Config</h3>
+  <ul class="checklist">
+    <li><span class="chk chk-ok">✓</span> LevelPlay SDK v9.3.0 installed (<code>com.unity.services.levelplay</code>)</li>
+    <li><span class="chk chk-ok">✓</span> <code>UNITY_LEVELPLAY</code> define set on Android, iOS, Standalone</li>
+    <li><span class="chk chk-ok">✓</span> <code>appKeyAndroid</code> set in Inspector (<code>"23eed9155"</code>)</li>
+    <li><span class="chk chk-fail">✗</span> <code>appKeyIOS</code> — still <code>"YOUR_IOS_APP_KEY"</code>! Replace before iOS build.</li>
+    <li><span class="chk chk-fail">✗</span> <code>appOpenAdUnitId</code> — still placeholder. Set or remove from Inspector.</li>
+    <li><span class="chk chk-warn">?</span> <code>enableTestMode</code> unchecked for release builds</li>
+  </ul>
+
+  <h3>// Scene Setup</h3>
+  <ul class="checklist">
+    <li><span class="chk chk-warn">?</span> AdManager GameObject in first/persistent scene with <code>DontDestroyOnLoad</code></li>
+    <li><span class="chk chk-warn">?</span> <code>RewardedPromptUI</code> Canvas in scene — set to <strong>INACTIVE</strong> in hierarchy</li>
+    <li><span class="chk chk-warn">?</span> Canvas Sort Order = 99</li>
+    <li><span class="chk chk-warn">?</span> All 5 UI references wired in RewardedPromptUI Inspector</li>
+    <li><span class="chk chk-ok">✓</span> No manual onClick wiring needed — AdManager wires buttons in Awake()</li>
+  </ul>
+
+  <h3>// Integration Calls in Your Code</h3>
+  <ul class="checklist">
+    <li><span class="chk chk-warn">?</span> <code>AdManager.SetUserConsent(true)</code> called before first launch if GDPR region</li>
+    <li><span class="chk chk-warn">?</span> <code>SetServerCountryCode()</code> called from backend login response</li>
+    <li><span class="chk chk-warn">?</span> <code>OnOnboardingComplete()</code> called once after tutorial finishes</li>
+    <li><span class="chk chk-warn">?</span> <code>OnLevelComplete(levelNumber)</code> called after each level</li>
+    <li><span class="chk chk-warn">?</span> <code>OnGameOver(onRevived, onDied)</code> called at game over screen</li>
+    <li><span class="chk chk-warn">?</span> <code>OnMenuOpen()</code> called when returning to main menu</li>
+    <li><span class="chk chk-warn">?</span> <code>OnGameplayStart()</code> called when round/match begins</li>
+    <li><span class="chk chk-warn">?</span> <code>SetAdFree()</code> called immediately after IAP purchase</li>
+    <li><span class="chk chk-warn">?</span> <code>SetAdFreeVerified()</code> called after receipt server validation</li>
+    <li><span class="chk chk-warn">?</span> All event subscriptions removed in <code>OnDestroy()</code></li>
+  </ul>
+
+  <h3>// GDPR / Privacy (v9.3.0)</h3>
+  <ul class="checklist">
+    <li><span class="chk chk-warn">?</span> GDPR consent dialog shown before SDK init on first launch</li>
+    <li><span class="chk chk-warn">?</span> <code>AdManager.SetUserConsent(true)</code> called after player agrees (static call)</li>
+    <li><span class="chk chk-warn">?</span> <code>AdManager.SetDoNotSell(true)</code> available in Privacy Settings screen (static call)</li>
+    <li><span class="chk chk-ok">✓</span> No <code>IronSource.Agent.*</code> consent calls — removed in v9.3.0</li>
+    <li><span class="chk chk-warn">?</span> Privacy policy updated for ad data collection</li>
+  </ul>
+
+  <h3>// Release QA</h3>
+  <ul class="checklist">
+    <li><span class="chk chk-warn">?</span> Test ads verified on real Android device</li>
+    <li><span class="chk chk-warn">?</span> Test ads verified on real iOS device</li>
+    <li><span class="chk chk-warn">?</span> Test mode disabled in release build (<code>enableTestMode = false</code>)</li>
+    <li><span class="chk chk-warn">?</span> <code>IsCountryVerified()</code> returns true in live build after login</li>
+    <li><span class="chk chk-warn">?</span> Ad-free purchase tested end-to-end with real receipt validation</li>
+    <li><span class="chk chk-warn">?</span> Interstitial cooldowns verified correct per country tier</li>
+    <li><span class="chk chk-warn">?</span> <code>OnAdsCompleted</code> event subscriber tested for all 5 types</li>
+  </ul>
+
+  <div class="alert alert-fail" style="margin-top:24px">
+    <span class="alert-icon">🔴</span>
+    <div><strong>2 Items Still Need Your Action:</strong> Set <code>appKeyIOS</code> and <code>appOpenAdUnitId</code> in your AdManager Inspector — both still have placeholder values (<code>"YOUR_IOS_APP_KEY"</code> and <code>"YOUR_APP_OPEN_UNIT_ID"</code>).</div>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<footer style="border-top:1px solid #1e2230; padding:24px 64px; color:#3a4060; font-family:'JetBrains Mono',monospace; font-size:11px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+  <span>AdManager v4 (Final) · LevelPlay SDK (com.unity.services.levelplay) · Unity 2022.3+</span>
+  <span>v5 Update — All API verified against actual SDK source · Constructor, size, position types corrected</span>
+</footer>
+
+</body>
+</html>
