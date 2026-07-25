@@ -37,14 +37,13 @@ public class AdManager : MonoBehaviour
 
     // ── INSPECTOR ──────────────────────────────────────────────────────────
     [Header("App Keys — LevelPlay Dashboard")]
-    [SerializeField] private string appKeyAndroid = "2405ac19d";
+    [SerializeField] private string appKeyAndroid = "273dd52c5";
     [SerializeField] private string appKeyIOS     = "YOUR_IOS_APP_KEY";
 
     [Header("Ad Unit IDs — LevelPlay Dashboard")]
-    [SerializeField] private string rewardedAdUnitId     = "s4e1a6c1c6fb914b";
-    [SerializeField] private string interstitialAdUnitId = "rm6p46jcmhtdvcfm";
-    [SerializeField] private string bannerAdUnitId       = "8qvzekq8vg28qli0";
-    [SerializeField] private string appOpenAdUnitId      = "YOUR_APP_OPEN_UNIT_ID";
+    [SerializeField] private string rewardedAdUnitId     = "znsmfqt2h5as69qt";
+    [SerializeField] private string interstitialAdUnitId = "ozs5onu6yf9p0hgx";
+    [SerializeField] private string bannerAdUnitId       = "071t2sdrks71wa1p";
 
     [Header("Banner")]
     [Tooltip("0=BottomCenter  1=TopCenter")]
@@ -53,17 +52,25 @@ public class AdManager : MonoBehaviour
     [SerializeField] private int bannerSizeIndex = 0;
 
     [Header("Frequency Caps (seconds)")]
-    [SerializeField] private float cooldownTier1 = 120f;
-    [SerializeField] private float cooldownTier2 = 90f;
-    [SerializeField] private float cooldownTier3 = 60f;
+    // ⚡ Set to 0 = NO cooldown between interstitials (ad shows every time).
+    [SerializeField] private float cooldownTier1 = 0f;
+    [SerializeField] private float cooldownTier2 = 0f;
+    [SerializeField] private float cooldownTier3 = 0f;
 
     [Header("Retention Guards")]
-    [SerializeField] private int interstitialUnlockAfterDays = 1;
-    [SerializeField] private int maxInterstitialsPerSession  = 6;
-    [SerializeField] private int tutorialLevelCount          = 3;
+    // ⚡ 0 = no 1-day wait, no tutorial wait. High cap = basically unlimited.
+    [SerializeField] private int interstitialUnlockAfterDays = 0;
+    [SerializeField] private int maxInterstitialsPerSession  = 9999;
+    [SerializeField] private int tutorialLevelCount          = 0;
 
-    [Header("App Open")]
-    [SerializeField] private float appOpenCooldownSeconds = 180f;
+    [Header("⚡ INSTANT MODE")]
+    // When true, TryShowInterstitial ignores ALL guards (day/level/session/cooldown)
+    // and shows the ad immediately if one is loaded. Use for test buttons.
+    [SerializeField] private bool instantShowNoLimits = true;
+
+    [Header("Rewarded Prompt UI (optional — leave RewardedPromptUI absent to skip)")]
+    [Tooltip("Seconds the custom Watch/Decline overlay stays up before auto-declining. 0 = no countdown, no auto-expire.")]
+    [SerializeField] private float rewardedPromptCountdown = 5f;
 
     [Header("Debug")]
     [SerializeField] private bool enableTestMode = false;
@@ -91,14 +98,12 @@ public class AdManager : MonoBehaviour
     private LevelPlayRewardedAd     _rewardedAd;
     private LevelPlayInterstitialAd _interstitialAd;
     private LevelPlayBannerAd       _bannerAd;
-    private LevelPlayInterstitialAd _appOpenAd;
 #endif
 
     private bool  _sdkInitialized;
     private bool  _bannerLoaded;
     private bool  _bannerVisible;
     private float _lastInterstitialTime = float.MinValue;
-    private float _lastAppOpenTime      = float.MinValue;
     private int   _interstitialsThisSession;
     private int   _sessionNumber;
     private int   _totalLevelsCompleted;
@@ -110,6 +115,7 @@ public class AdManager : MonoBehaviour
     private Action _pendingRewardCallback;
     private string _pendingRewardPlacement = "";
     private bool   _rewardGranted;
+    private Action _pendingPromptDecline;
 
     private int   _statRewardedPrompts;
     private int   _statRewardedShown;
@@ -119,7 +125,6 @@ public class AdManager : MonoBehaviour
     private int   _statBannerClicked;
     private float _statTotalAdRevenue;
 
-    private const float AdFreeGraceHours   = 72f;
     private bool  _adFreeServerVerified    = false;
     private bool  _countryVerifiedByServer = false;
     private int   _sdkInitRetryCount;
@@ -155,10 +160,17 @@ public class AdManager : MonoBehaviour
         InitializeSDK();
     }
 
-    private void OnApplicationPause(bool paused)
+    // TEST ONLY — press I in Play mode to force an interstitial right now,
+    // without needing to win/lose the game. Remove before release.
+    private void Update()
     {
-        if (!paused && _sdkInitialized && _sessionNumber > 1)
-            TryShowAppOpen();
+#if UNITY_EDITOR
+        if (Input.GetKeyDown(KeyCode.I))
+        {
+            bool shown = ShowInterstitialNow();
+            Debug.Log($"[AdManager] TEST — I pressed, ShowInterstitialNow() = {shown}");
+        }
+#endif
     }
 
     private void OnDestroy()
@@ -167,11 +179,6 @@ public class AdManager : MonoBehaviour
 #if UNITY_LEVELPLAY
         UnregisterEvents();
         _bannerAd?.DestroyAd();
-        if (_appOpenAd != null)
-        {
-            _appOpenAd.OnAdClosed     -= HandleAppOpenClosed;
-            _appOpenAd.OnAdLoadFailed -= HandleAppOpenLoadFailed;
-        }
 #endif
     }
 
@@ -188,8 +195,6 @@ public class AdManager : MonoBehaviour
             Debug.LogWarning("[AdManager] interstitialAdUnitId not configured.", this);
         if (string.IsNullOrEmpty(bannerAdUnitId) || bannerAdUnitId.StartsWith("YOUR_"))
             Debug.LogWarning("[AdManager] bannerAdUnitId not configured.", this);
-        if (string.IsNullOrEmpty(appOpenAdUnitId) || appOpenAdUnitId.StartsWith("YOUR_"))
-            Debug.LogWarning("[AdManager] appOpenAdUnitId not configured — App Open disabled.", this);
 #endif
     }
 
@@ -340,7 +345,6 @@ public class AdManager : MonoBehaviour
         LoadRewarded();
         LoadInterstitial();
         LoadBanner();
-        LoadAppOpen();
         OnSDKReady?.Invoke();
     }
 
@@ -396,6 +400,7 @@ public class AdManager : MonoBehaviour
         _pendingRewardCallback = null; _pendingRewardPlacement = "";
         OnRewardSkipped?.Invoke(p);
         AdsCompleted(AdsCompletedType.RewardedSkipped, p, false, a.ToString());
+        InvokePendingDecline();
         LoadRewarded();
     }
 
@@ -406,6 +411,7 @@ public class AdManager : MonoBehaviour
         Action cb = _pendingRewardCallback;
         string p  = _pendingRewardPlacement;
         _pendingRewardCallback = null; _pendingRewardPlacement = "";
+        _pendingPromptDecline = null; // accepted — clear without invoking
         cb?.Invoke();
         OnRewardGranted?.Invoke(p);
         AdsCompleted(AdsCompletedType.RewardedEarned, p, true, a.ToString());
@@ -419,9 +425,22 @@ public class AdManager : MonoBehaviour
             _pendingRewardCallback = null; _pendingRewardPlacement = "";
             OnRewardSkipped?.Invoke(p);
             AdsCompleted(AdsCompletedType.RewardedSkipped, p, false, a.ToString());
+            InvokePendingDecline();
         }
         _rewardGranted = false;
         LoadRewarded();
+    }
+
+    // FIX: when ShowRewardedPrompt falls back to the native ad (no RewardedPromptUI in
+    // scene), onDeclined was never stored anywhere, so a skipped/closed/failed rewarded
+    // ad silently dropped the decline callback — game flow stalled forever after a loss
+    // (no revive, no lose panel). _pendingPromptDecline now carries onDeclined through
+    // that path too; this fires it exactly once and clears it.
+    private void InvokePendingDecline()
+    {
+        Action decline = _pendingPromptDecline;
+        _pendingPromptDecline = null;
+        decline?.Invoke();
     }
 
     // ── INTERSTITIAL ───────────────────────────────────────────────────────
@@ -497,28 +516,6 @@ public class AdManager : MonoBehaviour
     private void HandleBannerDisplayed(LevelPlayAdInfo a) { }
     private void HandleBannerDisplayFail(LevelPlayAdInfo a, LevelPlayAdError e) => Debug.LogWarning($"[AdManager] Banner DISPLAY FAIL: {e}");
 
-    // ── APP OPEN ───────────────────────────────────────────────────────────
-    public void LoadAppOpen(string id = null)
-    {
-        if (!_sdkInitialized) return;
-        string u = string.IsNullOrEmpty(id) ? appOpenAdUnitId : id;
-        if (string.IsNullOrEmpty(u) || u.StartsWith("YOUR_")) return;
-        if (_appOpenAd != null)
-        {
-            _appOpenAd.OnAdClosed     -= HandleAppOpenClosed;
-            _appOpenAd.OnAdLoadFailed -= HandleAppOpenLoadFailed;
-        }
-        _appOpenAd = new LevelPlayInterstitialAd(u);
-        _appOpenAd.OnAdClosed     += HandleAppOpenClosed;
-        _appOpenAd.OnAdLoadFailed += HandleAppOpenLoadFailed;
-        _appOpenAd.LoadAd();
-    }
-
-    private void HandleAppOpenClosed(LevelPlayAdInfo a)
-    { AdsCompleted(AdsCompletedType.AppOpenClosed, Placement.AppForeground, false, a.ToString()); LoadAppOpen(); }
-
-    private void HandleAppOpenLoadFailed(LevelPlayAdError e) => Debug.LogWarning($"[AdManager] App Open LOAD FAIL: {e}");
-
 #endif // UNITY_LEVELPLAY
 
     // ── PUBLIC API (safe to call without SDK) ──────────────────────────────
@@ -561,17 +558,74 @@ public class AdManager : MonoBehaviour
     public void ShowRewardedPrompt(string placement, Action onAccepted, Action onDeclined = null)
     {
         if (!IsRewardedReady()) { onDeclined?.Invoke(); return; }
-        ShowRewarded(placement, onAccepted);
+
+        if (RewardedPromptUI.Instance == null)
+        {
+            _pendingPromptDecline = onDeclined;
+            ShowRewarded(placement, onAccepted);
+            return;
+        }
+
+        _pendingPromptDecline = onDeclined;
+        RewardedPromptUI.Instance.Show(
+            rewardText:       GetPromptRewardText(placement),
+            rewardIcon:       null,
+            countdownSeconds: rewardedPromptCountdown,
+            onWatch: () =>
+            {
+                _pendingPromptDecline = null;
+                ShowRewarded(placement, onAccepted);
+            },
+            onDecline: () =>
+            {
+                _pendingPromptDecline = null;
+                onDeclined?.Invoke();
+            });
+
+        if (rewardedPromptCountdown > 0f)
+            StartCoroutine(AutoExpirePrompt(rewardedPromptCountdown));
+    }
+
+    private static string GetPromptRewardText(string placement) => placement switch
+    {
+        Placement.ContinueGame  => "Watch an ad to continue",
+        Placement.DoubleCoins   => "Watch an ad to double your coins",
+        Placement.ExtraLives    => "Watch an ad for an extra life",
+        Placement.DailyBonus    => "Watch an ad for your daily bonus",
+        Placement.SkipWait      => "Watch an ad to skip the wait",
+        Placement.UnlockContent => "Watch an ad to unlock",
+        _                       => "Watch an ad for a reward"
+    };
+
+    // AutoExpirePrompt owns hide+decline on timeout — RewardedPromptUI only
+    // updates its own countdown label and never self-hides on expiry.
+    private IEnumerator AutoExpirePrompt(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        if (RewardedPromptUI.Instance != null && RewardedPromptUI.Instance.IsVisible)
+        {
+            RewardedPromptUI.Instance.Hide();
+            Action cb = _pendingPromptDecline;
+            _pendingPromptDecline = null;
+            cb?.Invoke();
+        }
     }
 
     public bool TryShowInterstitial(string placement)
     {
 #if UNITY_LEVELPLAY
+        if (IsAdFree()) return false;
         if (!_sdkInitialized || _interstitialAd == null || !_interstitialAd.IsAdReady()) { LoadInterstitial(); return false; }
-        if (GetDaysSinceInstall() < interstitialUnlockAfterDays)     return false;
-        if (_totalLevelsCompleted < tutorialLevelCount)              return false;
-        if (_interstitialsThisSession >= maxInterstitialsPerSession) return false;
-        if (Time.realtimeSinceStartup - _lastInterstitialTime < GetIsCooldown()) return false;
+
+        // ⚡ INSTANT MODE — skip every retention guard, show right away.
+        if (!instantShowNoLimits)
+        {
+            if (GetDaysSinceInstall() < interstitialUnlockAfterDays)     return false;
+            if (_totalLevelsCompleted < tutorialLevelCount)              return false;
+            if (_interstitialsThisSession >= maxInterstitialsPerSession) return false;
+            if (Time.realtimeSinceStartup - _lastInterstitialTime < GetIsCooldown()) return false;
+        }
+
         _interstitialAd.ShowAd(placement);
         _lastInterstitialTime = Time.realtimeSinceStartup;
         _interstitialsThisSession++;
@@ -580,6 +634,31 @@ public class AdManager : MonoBehaviour
         return false;
 #endif
     }
+
+    // ⚡ Call this DIRECTLY from a UI button to force an interstitial NOW.
+    // Bypasses day/level/session/cooldown guards regardless of instantShowNoLimits.
+    // Returns false only if the SDK isn't ready or no ad is loaded yet.
+    public bool ShowInterstitialNow(string placement = Placement.MenuTransition)
+    {
+#if UNITY_LEVELPLAY
+        if (!_sdkInitialized || _interstitialAd == null || !_interstitialAd.IsAdReady())
+        {
+            Debug.LogWarning("[AdManager] ShowInterstitialNow — no ad loaded yet, loading…");
+            LoadInterstitial();
+            return false;
+        }
+        _interstitialAd.ShowAd(placement);
+        _lastInterstitialTime = Time.realtimeSinceStartup;
+        _interstitialsThisSession++;
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    // ⚡ Call this DIRECTLY from a UI button to force a rewarded ad NOW (no prompt overlay).
+    public bool ShowRewardedNow(string placement = Placement.DoubleCoins, Action onRewarded = null)
+        => ShowRewarded(placement, onRewarded);
 
     public void ShowBanner()
     {
@@ -603,18 +682,6 @@ public class AdManager : MonoBehaviour
         if (_bannerAd == null) return;
         UnsubBanner(); _bannerAd.DestroyAd();
         _bannerAd = null; _bannerLoaded = false; _bannerVisible = false;
-#endif
-    }
-
-    private void TryShowAppOpen()
-    {
-#if UNITY_LEVELPLAY
-        if (GetDaysSinceInstall() < 1) return;
-        if (Time.realtimeSinceStartup - _lastAppOpenTime < appOpenCooldownSeconds) return;
-        if (string.IsNullOrEmpty(appOpenAdUnitId) || appOpenAdUnitId.StartsWith("YOUR_")) return;
-        if (_appOpenAd == null || !_appOpenAd.IsAdReady()) { LoadAppOpen(); return; }
-        _appOpenAd.ShowAd(Placement.AppForeground);
-        _lastAppOpenTime = Time.realtimeSinceStartup;
 #endif
     }
 
@@ -752,31 +819,31 @@ public class AdManager : MonoBehaviour
     }
 
     // ── AD-FREE IAP GUARD ─────────────────────────────────────────────────
+    // Fully local: a purchase recorded via SetAdFree() stays ad-free forever
+    // (PlayerPrefs), no backend round-trip required. SetAdFreeVerified() is
+    // an OPTIONAL extra confirmation for projects that add a receipt-
+    // validation server later — IsAdFree() does not require it.
     public void SetAdFree()
     {
         PlayerPrefs.SetInt("ad_free_purchased", 1);
-        PlayerPrefs.SetString("ad_free_local_timestamp", DateTime.UtcNow.ToString("O"));
         PlayerPrefs.Save();
         HideBanner();
         DestroyBanner();
-        Debug.Log("[AdManager] Ad-free activated.");
+        Debug.Log("[AdManager] Ad-free activated (local).");
     }
 
     public void SetAdFreeVerified(bool ok)
     {
         _adFreeServerVerified = ok;
         PlayerPrefs.SetInt("ad_free_server_verified", ok ? 1 : 0);
+        PlayerPrefs.Save();
         if (ok)
         {
-            PlayerPrefs.SetString("ad_free_verified_timestamp", DateTime.UtcNow.ToString("O"));
-            PlayerPrefs.Save();
             Debug.Log("[AdManager] Ad-free server-verified.");
         }
         else
         {
             PlayerPrefs.SetInt("ad_free_purchased", 0);
-            PlayerPrefs.DeleteKey("ad_free_local_timestamp");
-            PlayerPrefs.DeleteKey("ad_free_verified_timestamp");
             PlayerPrefs.Save();
             Debug.LogWarning("[AdManager] Ad-free REVOKED.");
 #if UNITY_LEVELPLAY
@@ -790,16 +857,7 @@ public class AdManager : MonoBehaviour
     {
         if (_adFreeServerVerified) return true;
         if (PlayerPrefs.GetInt("ad_free_server_verified", 0) == 1) { _adFreeServerVerified = true; return true; }
-        if (PlayerPrefs.GetInt("ad_free_purchased", 0) == 1)
-        {
-            string r = PlayerPrefs.GetString("ad_free_local_timestamp", "");
-            if (!string.IsNullOrEmpty(r) && DateTime.TryParse(r, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime t))
-            {
-                if ((DateTime.UtcNow - t).TotalHours < AdFreeGraceHours) return true;
-                Debug.LogWarning("[AdManager] Ad-free grace period expired.");
-            }
-        }
-        return false;
+        return PlayerPrefs.GetInt("ad_free_purchased", 0) == 1;
     }
 }
 
