@@ -17,8 +17,9 @@ Drop in two scripts, fill in your keys, wire a button — and you have Interstit
 6. [The retention guards (why an ad may NOT show)](#-the-retention-guards-why-an-ad-may-not-show)
 7. [Instant / test mode](#-instant--test-mode)
 8. [Inspector settings reference](#-inspector-settings-reference)
-9. [Before you publish ⚠️](#-before-you-publish-️)
-10. [Troubleshooting](#-troubleshooting)
+9. [Firebase Analytics (optional)](#-firebase-analytics-optional)
+10. [Before you publish ⚠️](#-before-you-publish-️)
+11. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -223,6 +224,52 @@ if (!instantShowNoLimits)
 | `maxInterstitialsPerSession` | Cap per app session | `9999` | **`6`** |
 | `appOpenCooldownSeconds` | Cooldown for App Open ads | `180` | `180` |
 | `enableTestMode` | Force LevelPlay test ads (auto-on in Editor) | on | **off** |
+
+---
+
+## 📊 Firebase Analytics (optional)
+
+The `file ferbise anltyec/` folder adds **Firebase Analytics v13.7.0** on top of the ad system so you can see, in the Firebase console, how your ads and levels actually perform. It's **fully optional** — the ad system works without it.
+
+### The two files
+
+| File | Role |
+|------|------|
+| `FirebaseAnalyticsManager.cs` | **The logger.** A singleton (`FirebaseAnalyticsManager.Instance`) that initializes Firebase, identifies the device, and logs game + ad events. |
+| `FirebaseAdsBridge.cs` | **The auto-connector.** Listens to `AdManager.OnAdsCompleted` and forwards every finished ad to Firebase automatically — you write zero extra code. |
+
+### How the bridge works
+
+```
+AdManager  ──(OnAdsCompleted event)──►  FirebaseAdsBridge  ──►  FirebaseAnalyticsManager  ──►  Firebase console
+```
+
+Whenever any ad finishes (rewarded earned/skipped, interstitial closed, banner loaded, app open closed), `AdManager` fires `OnAdsCompleted`. `FirebaseAdsBridge` catches it and calls `LogAdCompleted(adType, placement, rewarded)`. So **every ad is tracked automatically** once the bridge is in the scene.
+
+### Setup
+
+1. Install the **Firebase Analytics** SDK for Unity (import `google-services.json` for Android / `GoogleService-Info.plist` for iOS from your Firebase project).
+2. Create a GameObject → add `FirebaseAnalyticsManager.cs` (it's a `DontDestroyOnLoad` singleton — add once).
+3. Add `FirebaseAdsBridge.cs` to the **same GameObject as `AdManager`**. It auto-subscribes on enable.
+4. Done — ad events now flow to Firebase with no extra calls.
+
+### Events it logs
+
+**Ads:** `ad_completed` (with `ad_type`, `placement`, `rewarded`), `revive_offer_shown`, `revive_accepted`, `revive_declined`
+**Game flow:** `session_start`, `level_start`, `level_end`, `level_fail`, `level_selected`, `play_pressed`, `tutorial_complete`
+**Navigation:** `replay`, `go_home`, `continue_to_next`, `screen_view` (main_menu), `app_open`
+
+### Logging your own events manually
+```csharp
+FirebaseAnalyticsManager.Instance.LogLevelStart(levelNumber);
+FirebaseAnalyticsManager.Instance.LogReviveAccepted(levelNumber);
+
+// Generic helpers:
+FirebaseAnalyticsManager.Instance.LogEvent("custom_event");
+FirebaseAnalyticsManager.Instance.LogEvent("shop_open", "coins", 250);
+```
+
+> The manager guards every call with an `IsReady()` check, so events before Firebase finishes initializing are skipped safely (logged to console, never crash).
 
 ---
 
