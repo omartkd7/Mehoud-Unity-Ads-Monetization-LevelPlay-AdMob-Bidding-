@@ -307,6 +307,65 @@ AdManager.SetDoNotSell(false);    // CCPA
 | SDK init failed | Network / wrong key | Auto-retries up to 3× (30 s backoff); verify key & connection |
 | Nothing compiles / all ads dead | SDK not installed | Package Manager → install `com.unity.services.levelplay` |
 
+### ⚠️ "Only Unity Ads / ironSource fills — AdMob never shows"
+
+**Important: `AdManager.cs` never talks to AdMob directly.** It only calls the LevelPlay
+SDK — AdMob is a *bidder* that LevelPlay auctions internally. So this symptom is **never
+a bug in this script**; it's always a missing step in the Unity/LevelPlay/AdMob
+dashboards. Check these in order:
+
+1. **AdMob adapter installed?** `Window → LevelPlay → Integration Manager` → the AdMob
+   row must say **Installed** (not just "Available"). Without the adapter binary, AdMob
+   can't be called at all, no matter what's configured online — every impression falls
+   back to ironSource/Unity Ads.
+2. **AdMob activated in LevelPlay?** `LevelPlay dashboard → Monetize → SDK Networks →
+   AdMob` → must be **Activated**, linked via "Sign in with Google" (or a pasted
+   `pub-XXXXXXXXXXXXXXXX` Publisher ID as fallback).
+3. **Bidding instance added per ad unit?** For **each** ad unit (Interstitial, Rewarded,
+   Banner) → Mediation Group → Add Instance → AdMob → mode must be **"In-App Bidding"**,
+   not "Waterfall" — and the AdMob Ad Unit ID pasted there must exactly match the one
+   from `apps.admob.com` for that same format.
+4. **AdMob app approved?** `apps.admob.com → Apps → your app` → status column must NOT
+   say "Pending review". A pending/unapproved AdMob app returns **zero bids**, so
+   ironSource (which needs no such approval) always wins by default — this looks
+   exactly like "only Unity Ads works."
+5. **AndroidManifest App ID present and real?** Missing or placeholder
+   `com.google.android.gms.ads.APPLICATION_ID` meta-data crashes the AdMob adapter
+   silently (or the whole app on launch). See `manifest_setup.md`-style setup in your
+   Unity project (`ca-app-pub-XXXX~YYYY`, real value, not `YOUR_...`).
+6. **iOS `Info.plist` configured?** `GADApplicationIdentifier`, `SKAdNetworkItems`, and
+   `NSUserTrackingUsageDescription` must be present, and ATT must be requested **before**
+   `LevelPlay.Init()`. No ATT/IDFA on iOS can drop AdMob bids to near-zero even when
+   everything else is right.
+7. **Verify with the test suite, on a real device:** call `LevelPlay.LaunchTestSuite()`
+   (never trust the Editor — it never returns real fills). If AdMob doesn't even *appear*
+   as a bidder there, the problem is steps 1–4 above, not code.
+8. **Check win rate, not just presence:** `LevelPlay dashboard → Monetize → Reports →
+   Mediation`, filter by AdMob, wait 24h of live traffic. AdMob *appearing but losing*
+   every auction to Unity Ads is normal bidding behavior (highest bid wins) — that's not
+   a bug either, it just means AdMob's bid is currently lower in your market/region.
+
+### ⚠️ "IronSource network shows 0 fill in Mediation Report — only Unity Ads fills"
+
+Different symptom, same root cause pattern. **`IronSource` is the network built into the
+LevelPlay SDK core itself** (no separate adapter to install, unlike AdMob/AppLovin/Meta),
+so when it shows 0 impressions while `Unity Ads` fills fine, it's almost always one of:
+
+1. **IronSource demand not activated/approved for this app yet.**
+   `LevelPlay dashboard → Monetize → SDK Networks → IronSource` — new apps commonly sit
+   in a review/learning phase before ironSource's own demand starts bidding. This is
+   expected, not a bug.
+2. **No IronSource instance added to the Mediation Group for that ad unit.** Check the
+   waterfall/bidding group per ad unit (Interstitial/Rewarded/Banner) — the instance must
+   be present and enabled, exactly like the AdMob instance in the section above.
+3. **Low fill in your test country.** IronSource fill density varies a lot by country —
+   Tier 2/3 countries can show near-0% while Unity Ads still has broad coverage there.
+4. **Traffic volume too low.** Some networks need a minimum daily impression volume
+   before they compete meaningfully in the auction; a low-traffic new app may simply not
+   see IronSource bid yet.
+5. **Confirm in `LaunchTestSuite()` on a real device** — if IronSource doesn't appear as
+   a bidder there either, the fix is activation/account status (points 1–2), not code.
+
 ---
 
 ## 📄 License
