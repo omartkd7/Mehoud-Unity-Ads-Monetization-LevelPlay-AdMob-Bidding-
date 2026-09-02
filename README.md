@@ -368,6 +368,156 @@ so when it shows 0 impressions while `Unity Ads` fills fine, it's almost always 
 
 ---
 
+## 🤖 Full Prompt — reuse this on any other Unity project
+
+Copy everything in the box below into Claude Code (or any AI coding agent with Unity
+MCP / file access) at the root of a **different** Unity project to have it run the exact
+same audit-and-fix pass documented in this repo. It's written from real findings —
+several of these steps exist because they were *actually broken* in a real project, not
+theoretical.
+
+````
+You are integrating Unity LevelPlay (ironSource) ads + AdMob bidding + Firebase into
+this Unity project, using the METHOUD system (AdManager.cs / LevelManager.cs /
+FirebaseAnalyticsManager.cs / FirebaseAdsBridge.cs). Don't just write code — verify each
+step actually took effect. Work through this in order:
+
+1. AUDIT FIRST
+   - Find whether AdManager.cs / FirebaseAnalyticsManager.cs already exist somewhere in
+     Assets/ (they're often dropped into the project but never actually placed on a
+     GameObject in any scene — check for that specifically: search every .unity scene
+     file for the script's GUID, not just for the .cs file's existence).
+   - Check Packages/manifest.json for `com.unity.services.levelplay` and Firebase
+     packages — confirm they're actually resolved in Library/PackageCache, not just
+     listed.
+   - Check the Unity Editor console for existing errors before touching anything.
+
+2. WIRE THE SINGLETON INTO THE FIRST SCENE
+   - Find the scene at Build Settings index 0.
+   - Create one GameObject (e.g. "___AdsAndAnalytics") there, add AdManager +
+     FirebaseAnalyticsManager + FirebaseAdsBridge. It must be the ONLY instance —
+     AdManager.Awake() calls DontDestroyOnLoad, so it persists into every other scene
+     automatically. Do not add another copy anywhere else.
+   - Fill in the real App Key, and Banner/Interstitial/Rewarded Ad Unit IDs from the
+     user's LevelPlay dashboard, and the AdMob App ID from apps.admob.com. Never invent
+     placeholder-looking values — ask for the real ones.
+
+3. ⚠️ CHECK `UNITY_LEVELPLAY` IS ACTUALLY DEFINED — do not assume it auto-defines.
+   - The real LevelPlay SDK's .asmdef (Library/PackageCache/com.unity.services.levelplay@*/
+     Runtime/Unity.LevelPlay.asmdef) has an EMPTY `versionDefines` array. It does NOT
+     auto-add `UNITY_LEVELPLAY` the way some AdManager.cs templates assume.
+   - Check ProjectSettings/ProjectSettings.asset → scriptingDefineSymbols. If
+     `UNITY_LEVELPLAY` isn't listed for Android/iPhone/Standalone, add it manually — until
+     you do, AdManager silently runs its `#else` stub branch and logs
+     "[AdManager] LevelPlay SDK NOT installed!" even though the package is installed.
+     This is the single most common reason "I wrote the ad code but nothing shows."
+
+4. ⚠️ ANDROID MANIFEST — "Custom Main Manifest" REPLACES, it does not merge.
+   - If Assets/Plugins/Android/AndroidManifest.xml doesn't exist, you need it for the
+     AdMob App ID meta-data (`com.google.android.gms.ads.APPLICATION_ID`) — without it,
+     the app crashes on launch once ads go live.
+   - BUT: enabling "Custom Main Manifest" (ProjectSettings → useCustomMainManifest: 1)
+     makes Unity use YOUR file AS-IS instead of its own generated one. If your file only
+     contains `<application><meta-data>...</meta-data></application>`, you have SILENTLY
+     DELETED the `<activity>` block with the MAIN/LAUNCHER intent-filter that Unity
+     normally generates — the APK builds successfully with NO errors, installs fine, but
+     has NO launcher activity, so no icon ever appears on the device and the app cannot
+     be opened. This is invisible until you inspect a real built APK.
+   - Your custom manifest MUST include (adjust theme/attrs to the project's Unity
+     version):
+     ```xml
+     <activity android:name="com.unity3d.player.UnityPlayerActivity"
+               android:theme="@style/UnityThemeSelector"
+               android:launchMode="singleTask"
+               android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|layoutDirection|density"
+               android:exported="true">
+       <intent-filter>
+         <action android:name="android.intent.action.MAIN"/>
+         <category android:name="android.intent.category.LAUNCHER"/>
+       </intent-filter>
+       <meta-data android:name="unityplayer.UnityActivity" android:value="true"/>
+     </activity>
+     ```
+   - VERIFY, don't assume: after any build, run
+     `aapt2 dump badging path/to.apk | grep launchable-activity` — if that line is
+     missing, the app has no entry point, full stop.
+
+5. SET PRODUCTION-SAFE DEFAULTS, EXPLAIN THE TRADE-OFF
+   - Many AdManager.cs templates ship with `instantShowNoLimits = true` and 0-second
+     cooldowns as the DEFAULT (meant for the author's own testing) — if left as-is in a
+     shipped build, interstitials fire with zero cap, which is grounds for a Play
+     Store/App Store policy strike for disruptive ads. Set `instantShowNoLimits = false`,
+     real cooldowns (45–90s by tier), a session cap, and a tutorial-level guard — then
+     tell the user explicitly they can flip `instantShowNoLimits = true` temporarily for
+     their own testing, but must set it back before release.
+   - To change a serialized default and have it actually apply to an already-placed
+     component: edit the .cs default, trigger AssetDatabase refresh, wait for
+     recompile, then remove+re-add the component (or delete/recreate the GameObject) —
+     editing the .cs alone does NOT retroactively change values already serialized onto
+     an existing component instance in a scene.
+
+6. WIRE ADS INTO REAL GAMEPLAY CODE, NOT JUST NEW UNUSED METHODS
+   - Grep the project's actual gameplay scripts (not just the ad-system folder) for
+     commented-out or dead references to a PREVIOUS ad SDK (e.g. `Advertisements.Instance`,
+     `IronSource.Agent`, old ad manager classes). These mark the exact spots — retry
+     buttons, level-complete, menu transitions — where ad calls belong. Replace the dead
+     code with real `AdManager.Instance.TryShowInterstitial(...)` / `ShowBanner()` calls.
+   - Then VERIFY the wiring is real: grep the actual .unity scene files (not just the
+     .cs) for the method name inside `m_TargetAssemblyTypeName` / `m_MethodName` — a
+     button's OnClick binding in the Inspector is separate from the method existing in
+     code. A method can exist and compile fine while zero buttons call it.
+   - Check for buttons already wired to ad-sounding methods on scripts that no longer
+     exist in the project (`grep -rl "SomeOldAdsManager" Assets --include="*.unity"` but
+     the .cs file is gone) — these are silently broken leftovers from a previous
+     integration attempt. Don't assume every ad-related button reference is yours to fix;
+     check whether it's even reachable by the player (e.g. leftover template UI like an
+     unused multiplayer panel) before spending effort repairing it.
+
+7. FIREBASE — VERIFY THE PACKAGE-NAME MATCH AND THE NATIVE LIBS
+   - `Assets/google-services.json` → `package_name` must match the project's
+     applicationIdentifier EXACTLY, including case. Android package names are
+     case-sensitive; Firebase's match is case-sensitive too. If the user already
+     registered the app in Firebase/Play Console with a specific case, match it — don't
+     "fix" the casing yourself just because it looks unconventional.
+   - `DllNotFoundException: FirebaseCppApp-...` in the Unity Editor Play Mode is EXPECTED
+     and harmless — Firebase's native library only loads in a real build. Verify the real
+     device path works by unzipping the actual Android .aar (usually under
+     `Assets/GeneratedLocalRepo/Firebase/.../*.aar`) and confirming it contains
+     `jni/arm64-v8a/`, `jni/armeabi-v7a/` .so files — don't just trust that it's fine.
+
+8. VERIFY THE ADMOB BIDDING ADAPTER, NOT JUST THE CORE SDK
+   - `Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml` (or similarly-named files
+     for other networks) confirms the AdMob adapter + Google Mobile Ads SDK dependency is
+     registered — this is separate from the core LevelPlay package and easy to miss.
+   - This only covers the PROJECT side. Explicitly tell the user that AdMob bidding also
+     needs dashboard-side setup on levelplay.com (link AdMob account, enable bidding per
+     ad unit) that you cannot verify from local files.
+
+9. BUILD AND VERIFY THE ACTUAL APK — don't stop at "it compiled"
+   - A successful Gradle build (`BUILD SUCCESSFUL` in Editor.log) does NOT guarantee a
+     working app — see step 4. After any real build, use the Android SDK tools bundled
+     with the Unity install (`.../PlaybackEngines/AndroidPlayer/SDK/build-tools/<ver>/`)
+     to check the actual artifact:
+     - `aapt2 dump badging app.apk` → confirm `launchable-activity`, correct
+       `package name`, `native-code` covers `arm64-v8a`/`armeabi-v7a`.
+     - `aapt2 dump xmltree app.apk --file AndroidManifest.xml` → confirm the AdMob
+       APPLICATION_ID meta-data actually made it into the compiled manifest, not just
+       your source file.
+     - `apksigner verify -v app.apk` → confirms it's actually signed and installable.
+   - Ads themselves (real fills) can only be confirmed on a real device — LevelPlay
+     returns no real fills in the Unity Editor, ever. Say this explicitly so the user
+     doesn't waste time testing in Play Mode.
+
+10. BEFORE HANDING BACK, GIVE A HONEST STATUS TABLE, not a blanket "done"
+    - Separate what's verified (console clean, keys entered, manifest checked, real APK
+      inspected) from what's still unverified (real ad fills on device, AdMob bidding
+      dashboard config, iOS if no iOS keys were given) from what's genuinely optional
+      (extra ad networks like Facebook/Chartboost adapters that came bundled but aren't
+      configured).
+````
+
+---
+
 ## 📄 License
 
 See [LICENSE](LICENSE).
